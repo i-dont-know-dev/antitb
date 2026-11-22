@@ -505,7 +505,7 @@ button,input{font:inherit;color:inherit}
   color:#ffffff;
   font-weight:700;
 }
-@media(min-width:700px){
+@media(min-width:700px) and (max-width:899px){
   .app{
     max-width:460px;
     margin:0 auto;
@@ -517,6 +517,27 @@ input{user-select:text}
 .app:not([data-tab="map"]) .top-overlay,
 .app:not([data-tab="map"]) .map-fabs,
 .app:not([data-tab="map"]) .legend-box{display:none}
+
+.zoom-fab{display:none}
+@media(min-width:900px){
+  .app{--rail:88px}
+  #map{left:var(--rail);width:calc(100% - var(--rail))}
+  .dock-wrap{top:0;bottom:0;left:0;right:auto;width:var(--rail);padding:18px 10px;align-items:flex-start;justify-content:center;background:var(--surface);border-right:1px solid var(--outline)}
+  .mac-dock{display:flex;flex-direction:column;gap:4px;width:100%;max-width:none;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+  .nav-thumb{top:0;border-radius:16px}
+  .nav-btn{height:64px;border-radius:16px;font-size:11px}
+  .top-overlay{left:calc(var(--rail) + 16px);right:auto;width:380px;padding:16px 0 0}
+  .chips{flex-wrap:wrap;overflow:visible}
+  .legend-box{left:calc(var(--rail) + 16px);bottom:36px}
+  .map-fabs{right:20px;bottom:36px}
+  .zoom-fab{display:grid}
+  .bottom-sheet{left:auto;right:20px;bottom:36px;width:380px}
+  .screen{left:var(--rail);padding:32px max(32px,calc((100% - 760px)/2)) 32px}
+  .chip:hover{border-color:var(--primary)}
+  .fab:hover,.search-item:hover,.back-btn:hover{background:var(--surface-high)}
+  .nav-btn:hover{opacity:.9}
+  .btn:hover{border-color:var(--primary)}
+}
 </style>
 </head>
 <body>
@@ -550,6 +571,12 @@ input{user-select:text}
     <div class="legend-row"><span class="legend-line" style="background:#8a93a6;height:2px"></span>Направления ЦППК</div>
   </div>
   <div class="map-fabs" id="mapControls">
+    <button class="fab zoom-fab" id="zoomIn" aria-label="Приблизить">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button class="fab zoom-fab" id="zoomOut" aria-label="Отдалить">
+      <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+    </button>
     <button class="fab" id="centerBtn" aria-label="Вернуть обзор МЦД">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
@@ -670,6 +697,7 @@ input{user-select:text}
         </div>
         <span class="switch on" id="switchLegend"></span>
       </div>
+      <p class="attribution-note" id="sightStatus"></p>
     </div>
     <p class="attribution-note">Подложка: Esri World Dark Gray Base.</p>
   </section>
@@ -1378,7 +1406,7 @@ const MCD_CENTER = [55.755, 37.62];
 const MCD_INIT_ZOOM = 10;
 const crs = L.CRS.EPSG3857;
 const WORLD_M = 40075016.686;
-const RADIUS = 3200000;
+const RADIUS = 2000000;
 const CORE_RADIUS = 350000;
 const TINT = '#3b4d6b';
 const SHADE = '#98a4ba';
@@ -1488,6 +1516,12 @@ function prefetchTiles(minZ, maxZ, radius) {
   for (let i = 0; i < 3; i++) worker();
 }
 
+const centerM = crs.projection.project(L.latLng(MCD_CENTER));
+const MAP_BOUNDS = L.latLngBounds(
+  crs.projection.unproject(L.point(centerM.x - RADIUS, centerM.y - RADIUS)),
+  crs.projection.unproject(L.point(centerM.x + RADIUS, centerM.y + RADIUS))
+);
+
 const map = L.map('map', {
   zoomControl: false,
   attributionControl: true,
@@ -1495,8 +1529,14 @@ const map = L.map('map', {
   maxZoom: 16,
   zoomSnap: 0,
   zoomDelta: 0.5,
-  wheelPxPerZoomLevel: 110
+  wheelPxPerZoomLevel: 110,
+  maxBounds: MAP_BOUNDS,
+  maxBoundsViscosity: 1
 }).setView(MCD_CENTER, MCD_INIT_ZOOM);
+
+const fitMinZoom = () => map.setMinZoom(Math.max(3.5, map.getBoundsZoom(MAP_BOUNDS, true)));
+fitMinZoom();
+map.on('resize', fitMinZoom);
 
 map.attributionControl.setPrefix(false);
 
@@ -1676,6 +1716,8 @@ $('closeSheetBtn').addEventListener('click', closeStationSheet);
 $('focusStationBtn').addEventListener('click', () => {
   if (state.focus) map.flyTo([state.focus.lat, state.focus.lng], 14, {duration: 0.9});
 });
+$('zoomIn').addEventListener('click', () => map.zoomIn());
+$('zoomOut').addEventListener('click', () => map.zoomOut());
 $('centerBtn').addEventListener('click', () => map.flyTo(MCD_CENTER, MCD_INIT_ZOOM, {duration: 0.9}));
 
 const searchInput = $('searchInput');
@@ -1934,9 +1976,30 @@ function openSightingSheet(sg) {
   if (hadSelection) updateStations();
 }
 
+let sightCount = 0;
+
+function updateSightStatus() {
+  const el = $('sightStatus');
+  if (!TG_CHANNEL) {
+    el.textContent = '';
+    return;
+  }
+  if (!postsLoadedAt) {
+    el.textContent = postsFailed ? 'Канал не загрузился. Проверьте соединение.' : 'Загрузка канала…';
+    return;
+  }
+  const last = channelPosts[0] && channelPosts[0].date;
+  const lastText = last && !isNaN(last) ? agoText(Date.now() - last) : 'нет данных';
+  el.textContent = `Постов в канале: ${channelPosts.length}. Последний пост: ${lastText}. Меток на карте: ${sightCount}.`;
+}
+
 function renderSightings() {
   sightLayer.clearLayers();
-  if (!state.sightings) return;
+  sightCount = 0;
+  if (!state.sightings) {
+    updateSightStatus();
+    return;
+  }
   const now = Date.now();
   const items = [];
   postStore.forEach(({post, deletedAt}) => parseSightings(post).forEach(sg => {
@@ -1973,7 +2036,9 @@ function renderSightings() {
       zIndexOffset: sg.inactive ? 500 : 1000,
       opacity: sg.inactive ? 0.8 : 1
     }).on('click', () => openSightingSheet(sg)).addTo(sightLayer);
+    sightCount++;
   }));
+  updateSightStatus();
 }
 
 function newsMessage(title, text) {
@@ -2098,9 +2163,17 @@ const navBtns = [...dockEl.querySelectorAll('.nav-btn')];
 const screens = {news: $('newsScreen'), schedule: $('scheduleScreen'), settings: $('settingsScreen')};
 const hideTimers = {};
 
+const desktopQuery = window.matchMedia('(min-width:900px)');
+
 function positionThumb(btn) {
   thumbEl.style.width = `${btn.offsetWidth}px`;
-  thumbEl.style.transform = `translate3d(${btn.offsetLeft}px,0,0)`;
+  if (desktopQuery.matches) {
+    thumbEl.style.height = `${btn.offsetHeight}px`;
+    thumbEl.style.transform = `translate3d(${btn.offsetLeft}px,${btn.offsetTop}px,0)`;
+  } else {
+    thumbEl.style.height = '';
+    thumbEl.style.transform = `translate3d(${btn.offsetLeft}px,0,0)`;
+  }
 }
 
 function switchTab(tab) {
