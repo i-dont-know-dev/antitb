@@ -686,7 +686,7 @@ input{user-select:text}
       <div class="setting-row" id="toggleSightRow">
         <div>
           <strong>Метки ТБ и антиков</strong>
-          <small>Цвет: красный — свежая, жёлтый — около 2 часов, серый — неактивна</small>
+          <small>Цвет: красная — до 2ч, жёлтая — 2-4ч, серая — 4-8ч (потом исчезает)</small>
         </div>
         <span class="switch on" id="switchSight"></span>
       </div>
@@ -1397,11 +1397,17 @@ try {
 }
 
 const TG_CHANNEL = 'gdeseychastbiliantiki';
+// ⚠️ ВАЖНО: вставь сюда URL своего Cloudflare Worker после деплоя worker.js
+// Пример: 'https://antitb-news.your-name.workers.dev'
+// Если пусто — будут использоваться публичные CORS-прокси (часто не работают)
+const WORKER_URL = '';
 const NEWS_LIMIT = 40;
 const FETCH_TTL = 45000;
-const ACTIVE_MS = 2 * 60 * 60 * 1000;
-const OLD_GRACE = 15 * 60 * 1000;
-const DELETE_GRACE = 5 * 60 * 1000;
+const ACTIVE_MS = 2 * 60 * 60 * 1000;   // 2 часа — метка «активна» (красная)
+const FADE_MS = 4 * 60 * 60 * 1000;    // 4 часа — метка «старая» (жёлтая)
+const MAX_AGE_MS = 8 * 60 * 60 * 1000;  // 8 часов — метка исчезает
+const OLD_GRACE = 30 * 60 * 1000;
+const DELETE_GRACE = 10 * 60 * 1000;
 const MCD_CENTER = [55.755, 37.62];
 const MCD_INIT_ZOOM = 10;
 const crs = L.CRS.EPSG3857;
@@ -1794,12 +1800,16 @@ chips.forEach(chip => chip.addEventListener('click', () => {
 }));
 
 const PROXIES = [
+  // 1. Свой Cloudflare Worker (если задан WORKER_URL) — самый надёжный
+  ...(WORKER_URL ? [{url: () => WORKER_URL, timeout: 15000}] : []),
+  // 2. Cloudflare Pages Function (если хостится на Pages)
   {url: () => '/api/news', timeout: 15000},
+  // 3. Публичные CORS-прокси (часто не работают, но как fallback)
   {url: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`, timeout: 30000},
   {url: u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, json: true, timeout: 30000},
   {url: u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`, timeout: 15000},
-  {url: u => `https://thingproxy.freeboard.io/fetch/${u}`, timeout: 15000},
-  {url: u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, timeout: 15000}
+  {url: u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, timeout: 15000},
+  {url: u => `https://thingproxy.freeboard.io/fetch/${u}`, timeout: 15000}
 ];
 const newsList = $('newsList');
 let channelPosts = [];
@@ -1965,7 +1975,12 @@ function syncStore(list) {
   list.forEach(p => { if (p.id) postStore.set(p.id, {post: p, missed: 0, deletedAt: 0}); });
   postStore.forEach((entry, id) => {
     const date = entry.post.date;
-    if (!date || isNaN(date) || now > date.getTime() + ACTIVE_MS + OLD_GRACE) {
+    if (!date || isNaN(date)) {
+      postStore.delete(id);
+      return;
+    }
+    // Удаляем только совсем старые посты (> MAX_AGE_MS = 8 часов)
+    if (now > date.getTime() + MAX_AGE_MS) {
       postStore.delete(id);
       return;
     }
@@ -1975,8 +1990,8 @@ function syncStore(list) {
       entry.deletedAt = 0;
       return;
     }
-    // Если пост моложе 2 часов и его нет в выдаче — скорее всего прокси вернул не все посты, не помечаем удалённым
-    if (now < date.getTime() + ACTIVE_MS) return;
+    // Если пост моложе MAX_AGE_MS и его нет в выдаче — скорее всего прокси вернул не все посты
+    if (now < date.getTime() + MAX_AGE_MS) return;
     // Если id меньше minId — пост старый, Telegram его не отдаёт, не помечаем
     if (id < minId) return;
     // Если id больше maxId — это новый пост, которого мы не видели, игнорируем
@@ -2003,22 +2018,40 @@ function makeBadge(label, color) {
   return b;
 }
 
-const sightColor = sg => sg.inactive ? INACTIVE_COLOR : `hsl(${Math.round(Math.min(sg.age / ACTIVE_MS, 1) * 50)} 88% 56%)`;
+// Цвет метки: < 2ч — красная (активная), 2-4ч — жёлтая (старая), 4-8ч — серая (неактивная)
+const sightColor = sg => {
+  if (sg.deleted) return INACTIVE_COLOR;
+  if (sg.age >= FADE_MS) return INACTIVE_COLOR;  // серая
+  if (sg.age >= ACTIVE_MS) return `hsl(45 95% 55%)`;  // жёлтая
+  return `hsl(${Math.round(Math.min(sg.age / ACTIVE_MS, 1) * 50)} 88% 56%)`;  // от красной до оранжевой
+};
 
 function openSightingSheet(sg) {
   const hadSelection = Boolean(state.selected);
   state.selected = null;
   state.focus = sg.station;
   $('sheetTitle').textContent = sg.station.name;
-  const badges = [makeBadge(KINDS[sg.kind].label, sightColor(sg))];
-  if (sg.inactive) badges.push(makeBadge('Неактивна', INACTIVE_COLOR));
-  else if (sg.confirmed) badges.push(makeBadge('Подтверждено', '#34d399'));
+  const color = sightColor(sg);
+  const badges = [makeBadge(KINDS[sg.kind].label, color)];
+  if (sg.deleted) {
+    badges.push(makeBadge('Удалено', INACTIVE_COLOR));
+  } else if (sg.age >= FADE_MS) {
+    badges.push(makeBadge('Неактивна', INACTIVE_COLOR));
+  } else if (sg.age >= ACTIVE_MS) {
+    badges.push(makeBadge('Старая', 'hsl(45 95% 55%)'));
+  } else if (sg.confirmed) {
+    badges.push(makeBadge('Подтверждено', '#34d399'));
+  }
   sheetBadges.replaceChildren(...badges);
   const lines = [];
-  if (sg.inactive) {
+  if (sg.deleted) {
     const left = Math.max(1, Math.ceil((sg.removeAt - Date.now()) / 60000));
-    const reason = sg.deleted ? 'сообщение удалено из канала' : 'прошло больше 2 часов';
-    lines.push(`Неактивна: ${reason}. Метка пропадёт через ${left} мин.`);
+    lines.push(`Сообщение удалено из канала. Метка пропадёт через ${left} мин.`);
+  } else if (sg.age >= FADE_MS) {
+    const left = Math.max(1, Math.ceil((sg.removeAt - Date.now()) / 60000));
+    lines.push(`Неактивна: прошло больше 4 часов. Метка пропадёт через ${left} мин.`);
+  } else if (sg.age >= ACTIVE_MS) {
+    lines.push(`Старая метка: прошло больше 2 часов.`);
   }
   lines.push(sg.note || 'Без уточнений');
   $('sheetDesc').textContent = lines.join('\n');
@@ -2036,12 +2069,24 @@ function updateSightStatus() {
     return;
   }
   if (!postsLoadedAt) {
-    el.textContent = postsFailed ? 'Канал не загрузился. Проверьте соединение.' : 'Загрузка канала…';
+    el.textContent = postsFailed ? 'Канал не загрузился. Проверьте соединение или задеплойте Cloudflare Worker (worker.js).' : 'Загрузка канала…';
     return;
   }
   const last = channelPosts[0] && channelPosts[0].date;
   const lastText = last && !isNaN(last) ? agoText(Date.now() - last) : 'нет данных';
-  el.textContent = `Постов в канале: ${channelPosts.length}. Последний пост: ${lastText}. Меток на карте: ${sightCount}.`;
+  const active = sightCount;
+  let warn = '';
+  if (channelPosts.length && !sightCount) {
+    const ageMs = last ? Date.now() - last.getTime() : 0;
+    if (ageMs > MAX_AGE_MS) {
+      warn = ' Все посты старше 8 часов — метки не отображаются.';
+    } else if (ageMs > ACTIVE_MS) {
+      warn = ' Свежих постов (< 2ч) нет — все метки старые/неактивные.';
+    } else {
+      warn = ' Метки должны быть. Если их нет — проверьте парсер.';
+    }
+  }
+  el.textContent = `Постов: ${channelPosts.length}. Последний: ${lastText}. Меток: ${active}.${warn}`;
 }
 
 function renderSightings() {
@@ -2054,10 +2099,11 @@ function renderSightings() {
   const now = Date.now();
   const items = [];
   postStore.forEach(({post, deletedAt}) => parseSightings(post).forEach(sg => {
-    const removeAt = Math.min(sg.date.getTime() + ACTIVE_MS + OLD_GRACE, deletedAt ? deletedAt + DELETE_GRACE : Infinity);
+    // Метка живёт MAX_AGE_MS (8 часов) или до удаления+DELETE_GRACE
+    const removeAt = Math.min(sg.date.getTime() + MAX_AGE_MS, deletedAt ? deletedAt + DELETE_GRACE : Infinity);
     if (now >= removeAt) return;
     const age = Math.max(0, now - sg.date.getTime());
-    items.push({...sg, age, removeAt, deleted: Boolean(deletedAt), inactive: Boolean(deletedAt) || age >= ACTIVE_MS});
+    items.push({...sg, age, removeAt, deleted: Boolean(deletedAt)});
   }));
   items.sort((x, y) => x.age - y.age);
   const seen = new Set();
@@ -2072,8 +2118,9 @@ function renderSightings() {
   groups.forEach(group => group.forEach((sg, i) => {
     const color = sightColor(sg);
     const dx = (i - (group.length - 1) / 2) * 38;
+    const faded = sg.deleted || sg.age >= FADE_MS;
     if (sg.route && i === 0) {
-      L.polyline(sg.route, {color, weight: 5, opacity: sg.inactive ? 0.5 : 0.9, dashArray: '1 9', lineCap: 'round', interactive: false}).addTo(sightLayer);
+      L.polyline(sg.route, {color, weight: 5, opacity: faded ? 0.4 : 0.9, dashArray: '1 9', lineCap: 'round', interactive: false}).addTo(sightLayer);
     }
     const icon = L.divIcon({
       className: 'sight-icon',
@@ -2084,8 +2131,8 @@ function renderSightings() {
     L.marker([sg.station.lat, sg.station.lng], {
       icon,
       keyboard: false,
-      zIndexOffset: sg.inactive ? 500 : 1000,
-      opacity: sg.inactive ? 0.8 : 1
+      zIndexOffset: faded ? 500 : 1000,
+      opacity: faded ? 0.7 : 1
     }).on('click', () => openSightingSheet(sg)).addTo(sightLayer);
     sightCount++;
   }));
