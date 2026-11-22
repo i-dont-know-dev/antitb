@@ -1397,8 +1397,8 @@ try {
 }
 
 const TG_CHANNEL = 'gdeseychastbiliantiki';
-const NEWS_LIMIT = 20;
-const FETCH_TTL = 50000;
+const NEWS_LIMIT = 40;
+const FETCH_TTL = 45000;
 const ACTIVE_MS = 2 * 60 * 60 * 1000;
 const OLD_GRACE = 15 * 60 * 1000;
 const DELETE_GRACE = 5 * 60 * 1000;
@@ -1406,8 +1406,8 @@ const MCD_CENTER = [55.755, 37.62];
 const MCD_INIT_ZOOM = 10;
 const crs = L.CRS.EPSG3857;
 const WORLD_M = 40075016.686;
-const RADIUS = 2000000;
-const CORE_RADIUS = 350000;
+const RADIUS = 4500000;
+const CORE_RADIUS = 600000;
 const TINT = '#3b4d6b';
 const SHADE = '#98a4ba';
 const VEIL = 'rgba(8,12,20,0.3)';
@@ -1525,18 +1525,21 @@ const MAP_BOUNDS = L.latLngBounds(
 const map = L.map('map', {
   zoomControl: false,
   attributionControl: true,
-  minZoom: 3.5,
+  minZoom: 2.5,
   maxZoom: 16,
-  zoomSnap: 0,
+  zoomSnap: 0.25,
   zoomDelta: 0.5,
-  wheelPxPerZoomLevel: 110,
+  wheelPxPerZoomLevel: 60,
+  wheelDebounceTime: 40,
   maxBounds: MAP_BOUNDS,
-  maxBoundsViscosity: 1
+  maxBoundsViscosity: 0.0,
+  inertia: true,
+  inertiaDeceleration: 3400,
+  inertiaMaxSpeed: 2400,
+  easeLinearity: 0.2
 }).setView(MCD_CENTER, MCD_INIT_ZOOM);
 
-const fitMinZoom = () => map.setMinZoom(Math.max(3.5, map.getBoundsZoom(MAP_BOUNDS, true)));
-fitMinZoom();
-map.on('resize', fitMinZoom);
+map.on('resize', () => map.setMinZoom(2.5));
 
 map.attributionControl.setPrefix(false);
 
@@ -1791,11 +1794,12 @@ chips.forEach(chip => chip.addEventListener('click', () => {
 }));
 
 const PROXIES = [
-  {url: () => '/api/news'},
-  {url: u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, json: true},
-  {url: u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`},
-  {url: u => `https://corsproxy.org/?${encodeURIComponent(u)}`},
-  {url: u => `https://thingproxy.freeboard.io/fetch/${u}`}
+  {url: () => '/api/news', timeout: 15000},
+  {url: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`, timeout: 30000},
+  {url: u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, json: true, timeout: 30000},
+  {url: u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`, timeout: 15000},
+  {url: u => `https://thingproxy.freeboard.io/fetch/${u}`, timeout: 15000},
+  {url: u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, timeout: 15000}
 ];
 const newsList = $('newsList');
 let channelPosts = [];
@@ -1825,7 +1829,26 @@ const KINDS = {
 const INACTIVE_COLOR = '#64748b';
 const HINT_RE = /(?<![а-яёa-z])(?:диам\S*|мцд|[dд])\s*-?\s*([1-4])(?!\d)/i;
 const HINT_STRIP = new RegExp(HINT_RE.source, 'gi');
-const ROUTE_RE = /(?<![а-яё])(?:со?|от|между)\s+(?:станции\s+)?(.+?)\s+(?:до|и)\s+(?:станции\s+)?(.+)$/i;
+const ROUTE_RE = /(?:со\s+станции|от\s+станции|со|от|между)\s+(.+?)\s+(?:до|и)\s+(?:станции\s+)?(.+)$/i;
+
+const STATION_SYNONYMS = {
+  'остров мечтв': 'остров мечты',
+  'остров мечт': 'остров мечты',
+  'рыбацком': 'рыбацкое',
+  'рыбацкая': 'рыбацкое',
+  'красные строители': 'красный строитель',
+  'красного строителя': 'красный строитель',
+  'красногорая': 'красногорская',
+  'дегунено': 'дегунино',
+  'дегунино': 'дегунино',
+  'павшено': 'павшино',
+  'остров мечтв': 'остров мечты',
+  'остров мечт': 'остров мечты',
+  'москва-сити': 'москва-сити тестовская',
+  'москва сити': 'москва-сити тестовская',
+  'серп и молот': 'серп и молот',
+  'серп и молот': 'серп и молот'
+};
 
 function norm(s) {
   return s.toLowerCase().replace(/ё/g, 'е').replace(/[^а-яa-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1854,9 +1877,15 @@ function findStation(s) {
   const clean = p => p
     .replace(HINT_STRIP, ' ')
     .replace(/\d+\s*км/gi, ' ')
+    .replace(/\b\d+\s*(?:путь|пути|плаха|плахи)\b/gi, ' ')
+    .replace(/\b(?:в\s+конце|в\s+начале|в\s+сторону\s+\S*|на\s+платформе|на\s+станции)\b/gi, ' ')
     .replace(/^\s*(?:(?:на|в|у|около|рядом\s+со?)\s+)?(?:станци\S*|платформ\S*|ст\.)\s+/i, '')
+    .replace(/^\s*(?:д\d|[dд]\d)\s+/i, ' ')
     .trim();
-  const candidates = [...stripped.split(/[,;]/).map(clean), clean(stripped)].map(norm).filter(q => q.length >= 3);
+  const candidates = [...stripped.split(/[,;]/).map(clean), clean(stripped)]
+    .map(norm)
+    .map(q => STATION_SYNONYMS[q] || q)
+    .filter(q => q.length >= 3);
   let best = null;
   let bestScore = Infinity;
   candidates.forEach(q => {
@@ -1885,36 +1914,46 @@ function routePath(a, b) {
 
 function parseSightings(post) {
   if (!post.date || isNaN(post.date)) return [];
-  const text = post.text.replace(/\u00a0/g, ' ');
-  const kindLine = (text.match(/👀\s*([^\n]+)/) || text.match(/замечен\S*\s+([^\n]+)/i) || [])[1];
-  if (!kindLine) return [];
-  const locRaw = (text.match(/📍\s*([^\n]+)/) || text.match(/(?:на\s+платформе|на\s+станции|в\s+поезде|рядом\s+со?\s+(?:станци\S*|платформ\S*))\s*:?\s*([^\n]+)/i) || [])[1];
-  if (!locRaw) return [];
-  const s = locRaw.replace(/^[^:]*:\s*/, '');
-  let station = null;
-  let route = null;
-  const rm = s.match(ROUTE_RE);
-  if (rm) {
-    const a = findStation(rm[1]);
-    const b = findStation(rm[2]);
-    if (a && b) {
-      route = routePath(a, b);
-      if (route) {
-        const mid = route[Math.floor(route.length / 2)];
-        station = {name: `${a.name} — ${b.name}`, lat: mid[0], lng: mid[1], lines: []};
-      } else {
-        station = b;
-      }
-    } else {
-      station = a || b;
-    }
+  const fullText = post.text.replace(/\u00a0/g, ' ');
+  // Разбиваем на блоки по заголовку "Где сейчас" или по 👀 — на случай если в посте несколько меток
+  const blocks = fullText.split(/(?=Где\s+сейчас|👀)/i).filter(b => b.includes('👀') || /замечен/i.test(b));
+  if (!blocks.length) {
+    blocks.push(fullText);
   }
-  if (!station) station = findStation(s);
-  if (!station) return [];
-  const kinds = Object.keys(KINDS).filter(k => KINDS[k].re && KINDS[k].re.test(kindLine));
-  const note = (text.match(/\u2139\uFE0F?\s*([^\n]+)/) || [])[1] || '';
-  const confirmed = /подтвержд/i.test(text);
-  return (kinds.length ? kinds : ['other']).map(kind => ({kind, station, route, note, confirmed, date: post.date}));
+  const results = [];
+  for (const text of blocks) {
+    const kindLine = (text.match(/👀\s*([^\n]+)/) || text.match(/замечен\S*\s+([^\n]+)/i) || [])[1];
+    if (!kindLine) continue;
+    const locRaw = (text.match(/📍\s*([^\n]+)/) || text.match(/(?:на\s+платформе|на\s+станции|в\s+поезде|рядом\s+со?\s+(?:станци\S*|платформ\S*))\s*:?\s*([^\n]+)/i) || [])[1];
+    if (!locRaw) continue;
+    const s = locRaw.replace(/^[^:]*:\s*/, '').trim();
+    if (s.length < 3) continue;
+    let station = null;
+    let route = null;
+    const rm = s.match(ROUTE_RE);
+    if (rm) {
+      const a = findStation(rm[1]);
+      const b = findStation(rm[2]);
+      if (a && b) {
+        route = routePath(a, b);
+        if (route) {
+          const mid = route[Math.floor(route.length / 2)];
+          station = {name: `${a.name} — ${b.name}`, lat: mid[0], lng: mid[1], lines: []};
+        } else {
+          station = b;
+        }
+      } else {
+        station = a || b;
+      }
+    }
+    if (!station) station = findStation(s);
+    if (!station) continue;
+    const kinds = Object.keys(KINDS).filter(k => KINDS[k].re && KINDS[k].re.test(kindLine));
+    const note = (text.match(/\u2139\uFE0F?\s*([^\n]+)/) || [])[1] || '';
+    const confirmed = /подтвержд/i.test(text);
+    results.push(...(kinds.length ? kinds : ['other']).map(kind => ({kind, station, route, note, confirmed, date: post.date})));
+  }
+  return results;
 }
 
 function syncStore(list) {
@@ -1922,6 +1961,7 @@ function syncStore(list) {
   const ids = new Set(list.map(p => p.id).filter(Boolean));
   if (!ids.size) return;
   const minId = Math.min(...ids);
+  const maxId = Math.max(...ids);
   list.forEach(p => { if (p.id) postStore.set(p.id, {post: p, missed: 0, deletedAt: 0}); });
   postStore.forEach((entry, id) => {
     const date = entry.post.date;
@@ -1929,9 +1969,20 @@ function syncStore(list) {
       postStore.delete(id);
       return;
     }
-    if (ids.has(id) || id < minId) return;
+    // Если пост в списке — сбрасываем счётчик пропусков
+    if (ids.has(id)) {
+      entry.missed = 0;
+      entry.deletedAt = 0;
+      return;
+    }
+    // Если пост моложе 2 часов и его нет в выдаче — скорее всего прокси вернул не все посты, не помечаем удалённым
+    if (now < date.getTime() + ACTIVE_MS) return;
+    // Если id меньше minId — пост старый, Telegram его не отдаёт, не помечаем
+    if (id < minId) return;
+    // Если id больше maxId — это новый пост, которого мы не видели, игнорируем
+    if (id > maxId) return;
     entry.missed++;
-    if (entry.missed >= 2 && !entry.deletedAt) entry.deletedAt = now;
+    if (entry.missed >= 3 && !entry.deletedAt) entry.deletedAt = now;
   });
 }
 
@@ -2055,15 +2106,22 @@ function newsMessage(title, text) {
 
 async function fetchChannelHtml(channel) {
   const url = `https://t.me/s/${encodeURIComponent(channel)}`;
+  let lastErr = null;
   for (const proxy of PROXIES) {
     try {
-      const res = await fetch(proxy.url(url), {signal: AbortSignal.timeout(8000)});
-      if (!res.ok) continue;
+      const to = proxy.timeout || 12000;
+      const res = await fetch(proxy.url(url), {
+        signal: AbortSignal.timeout(to),
+        headers: {'accept': 'text/html,application/xhtml+xml'},
+        cache: 'no-store'
+      });
+      if (!res.ok) { lastErr = new Error(`HTTP ${res.status}`); continue; }
       const body = proxy.json ? (await res.json()).contents : await res.text();
       if (body && body.includes('tgme_widget_message')) return body;
-    } catch {}
+      lastErr = new Error('no messages in response');
+    } catch (e) { lastErr = e; }
   }
-  throw new Error('fetch failed');
+  throw lastErr || new Error('fetch failed');
 }
 
 function parsePosts(html) {
