@@ -1397,10 +1397,7 @@ try {
 }
 
 const TG_CHANNEL = 'gdeseychastbiliantiki';
-// ⚠️ ВАЖНО: вставь сюда URL своего Cloudflare Worker после деплоя worker.js
-// Пример: 'https://antitb-news.your-name.workers.dev'
-// Если пусто — будут использоваться публичные CORS-прокси (часто не работают)
-const WORKER_URL = '';
+const WORKER_URL = 'antitb.alik3ckx.workers.dev';
 const NEWS_LIMIT = 40;
 const FETCH_TTL = 45000;
 const ACTIVE_MS = 2 * 60 * 60 * 1000;   // 2 часа — метка «активна» (красная)
@@ -2164,8 +2161,14 @@ async function fetchChannelHtml(channel) {
       });
       if (!res.ok) { lastErr = new Error(`HTTP ${res.status}`); continue; }
       const body = proxy.json ? (await res.json()).contents : await res.text();
-      if (body && body.includes('tgme_widget_message')) return body;
-      lastErr = new Error('no messages in response');
+      // Строгая проверка: реальный ответ Telegram содержит data-post="канал/NNN"
+      // с реальным именем канала. В index.html этой строки НЕТ.
+      const postMarker = `data-post="${channel}/`;
+      if (!body || !body.includes(postMarker)) {
+        lastErr = new Error('not a real telegram response');
+        continue;
+      }
+      return body;
     } catch (e) { lastErr = e; }
   }
   throw lastErr || new Error('fetch failed');
@@ -2239,7 +2242,7 @@ function renderPosts(list) {
 function renderNews() {
   if (!TG_CHANNEL) return newsMessage('Канал не задан', 'Укажите имя канала в константе TG_CHANNEL.');
   if (channelPosts.length) return renderPosts(channelPosts);
-  if (postsFailed) return newsMessage('Не удалось загрузить', 'Проверьте соединение и повторите позже.');
+  if (postsFailed) return newsMessage('Не удалось загрузить канал', 'Проверьте, что задеплоена Pages Function (functions/api/news.js) или задан WORKER_URL. Иначе Telegram блокирует запросы из браузера (CORS).');
   if (postsLoadedAt) return newsMessage('Пока пусто', 'В канале нет публичных постов.');
   newsMessage('Загрузка', 'Получаем последние новости…');
 }
