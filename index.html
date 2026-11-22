@@ -300,7 +300,7 @@ button,input{font:inherit;color:inherit}
 .sheet-head h2{margin:0;font-size:17px;font-weight:700;letter-spacing:-.2px}
 .badges{display:flex;flex-wrap:wrap;gap:5px;flex:none}
 .badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;color:#111318}
-.sheet-desc{margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--on-surface-variant)}
+.sheet-desc{white-space:pre-line;margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--on-surface-variant)}
 .sheet-meta{margin-top:8px;font-size:12px;color:var(--on-surface)}
 .sheet-actions{display:flex;gap:8px;margin-top:14px}
 .btn{
@@ -659,7 +659,7 @@ input{user-select:text}
       <div class="setting-row" id="toggleSightRow">
         <div>
           <strong>Метки ТБ и антиков</strong>
-          <small>Последние сообщения из канала на карте</small>
+          <small>Цвет: красный — свежая, жёлтый — около 2 часов, серый — неактивна</small>
         </div>
         <span class="switch on" id="switchSight"></span>
       </div>
@@ -988,6 +988,7 @@ const RAIL_SRC = {
 Орудьево,56.4380,37.4090
 Дубна,56.7314,37.1714`},
   Ryar: {name: 'Ярославское', color: '#1e88e5', s: `Площадь трёх вокзалов,55.7768,37.6518
+Маленковская,55.8195,37.6750
 Лосиноостровская,55.8719,37.7022
 Перловская,55.8884,37.7183
 Тайнинская,55.9006,37.7236
@@ -1370,7 +1371,9 @@ try {
 const TG_CHANNEL = 'gdeseychastbiliantiki';
 const NEWS_LIMIT = 20;
 const FETCH_TTL = 50000;
-const SIGHT_TTL = 4 * 60 * 60 * 1000;
+const ACTIVE_MS = 2 * 60 * 60 * 1000;
+const OLD_GRACE = 15 * 60 * 1000;
+const DELETE_GRACE = 5 * 60 * 1000;
 const MCD_CENTER = [55.755, 37.62];
 const MCD_INIT_ZOOM = 10;
 const crs = L.CRS.EPSG3857;
@@ -1540,8 +1543,15 @@ Object.entries(LINES).forEach(([code, line]) => {
     if (st.info) known.info = st.info;
   });
 });
-const ALL_STATIONS = [...stationIndex.values()].flat();
-ALL_STATIONS.forEach(st => { st.norm = norm(st.name); });
+const EXTRA_STOPS = [
+  {name: 'Остров Мечты', lat: 55.694, lng: 37.671, info: 'Станция метро'},
+  {name: 'Рыбацкое', lat: 59.8305, lng: 30.5002, info: 'Санкт-Петербург'}
+];
+const ALL_STATIONS = [...stationIndex.values()].flat().concat(EXTRA_STOPS.map(st => ({...st, lines: [], hub: false})));
+ALL_STATIONS.forEach(st => {
+  const inner = (st.name.match(/\(([^)]*)\)/) || [])[1];
+  st.norms = [...new Set([st.name, st.name.replace(/\s*\([^)]*\)/g, ''), inner].filter(Boolean).map(norm))];
+});
 
 const lineRank = l => l.trunk ? 2 : l.rail ? 1 : 0;
 const linePolylines = {};
@@ -1750,10 +1760,11 @@ let channelPosts = [];
 let postsLoadedAt = 0;
 let postsLoading = false;
 let postsFailed = false;
+const postStore = new Map();
 
 const ICONS = {
   tb: c => `<svg viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.2c0 4.6-3.1 8.2-7.5 9.8-4.4-1.6-7.5-5.2-7.5-9.8V6z" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><path d="M12 8.4l1.2 2.5 2.7.4-2 1.9.5 2.7-2.4-1.3-2.4 1.3.5-2.7-2-1.9 2.7-.4z" fill="${c}"/></svg>`,
-  anti: () => `<svg viewBox="0 0 24 24"><path d="M3.6 3.4l5.6 2.2-3.6 4.4z" fill="#f472b6"/><path d="M20.4 3.4l-5.6 2.2 3.6 4.4z" fill="#f472b6"/><circle cx="12" cy="13" r="8.6" fill="#f472b6"/><ellipse cx="12" cy="15.6" rx="4.4" ry="3.3" fill="#fbcfe8"/><circle cx="10.5" cy="15.6" r="0.9" fill="#9d174d"/><circle cx="13.5" cy="15.6" r="0.9" fill="#9d174d"/><circle cx="8.3" cy="10.8" r="1.2" fill="#0b1224"/><circle cx="15.7" cy="10.8" r="1.2" fill="#0b1224"/></svg>`,
+  anti: c => `<svg viewBox="0 0 24 24"><path d="M3.6 3.4l5.6 2.2-3.6 4.4z" fill="${c}"/><path d="M20.4 3.4l-5.6 2.2 3.6 4.4z" fill="${c}"/><circle cx="12" cy="13" r="8.6" fill="${c}"/><ellipse cx="12" cy="15.6" rx="4.4" ry="3.3" fill="#fff" fill-opacity=".5"/><circle cx="10.5" cy="15.6" r="0.9" fill="#0b1224"/><circle cx="13.5" cy="15.6" r="0.9" fill="#0b1224"/><circle cx="8.3" cy="10.8" r="1.2" fill="#0b1224"/><circle cx="15.7" cy="10.8" r="1.2" fill="#0b1224"/></svg>`,
   ops: c => `<svg viewBox="0 0 24 24"><path d="M2 12s3.7-7 10-7 10 7 10 7-3.7 7-10 7S2 12 2 12z" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="${c}"/></svg>`,
   cop: c => `<svg viewBox="0 0 24 24"><path d="M4 14.5v-2C4 8.2 7.5 5 12 5s8 3.2 8 7.5v2z" fill="${c}"/><path d="M2.5 15h19v1.8c0 .7-.5 1.2-1.2 1.2H3.7c-.7 0-1.2-.5-1.2-1.2z" fill="${c}" fill-opacity=".65"/><circle cx="12" cy="10.2" r="1.7" fill="#0b1224"/></svg>`,
   ctrl: c => `<svg viewBox="0 0 24 24"><path d="M3.5 7h17v3.2a1.9 1.9 0 0 0 0 3.6V17h-17v-3.2a1.9 1.9 0 0 0 0-3.6z" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><path d="M14.5 8.5v7" stroke="${c}" stroke-width="2" stroke-dasharray="1.6 1.8"/></svg>`,
@@ -1761,13 +1772,18 @@ const ICONS = {
 };
 
 const KINDS = {
-  tb: {label: 'ТБ', color: '#f5a524', re: /(?<![а-яё])тб(?![а-яё])|транспортн\S*\s+безопасн/i},
-  anti: {label: 'Антики', color: '#f472b6', re: /(?<![а-яё])антик(?:и|ов|ам|ами)?(?![а-яё])|антитеррор/i},
-  ops: {label: 'Опера', color: '#a78bfa', re: /(?<![а-яё])опер(?:а|ы|ов|у|ам|ами)?(?![а-яё])|оперативн/i},
-  cop: {label: 'Менты', color: '#60a5fa', re: /(?<![а-яё])мент(?:ы|ов|ам|ами|а)?(?![а-яё])|полиц|патрул|росгвард/i},
-  ctrl: {label: 'Контролёры', color: '#34d399', re: /контр[оа]л[её]р/i},
-  other: {label: 'Замечено', color: '#94a3b8', re: null}
+  tb: {label: 'ТБ', re: /(?<![а-яё])тб(?![а-яё])|транспортн\S*\s+безопасн/i},
+  anti: {label: 'Антики', re: /(?<![а-яё])антик(?:и|ов|ам|ами)?(?![а-яё])|антитеррор/i},
+  ops: {label: 'Опера', re: /(?<![а-яё])опер(?:а|ы|ов|у|ам|ами)?(?![а-яё])|оперативн/i},
+  cop: {label: 'Менты', re: /(?<![а-яё])мент(?:ы|ов|ам|ами|а)?(?![а-яё])|полиц|патрул|росгвард/i},
+  ctrl: {label: 'Контролёры', re: /контр[оа]л[её]р/i},
+  other: {label: 'Замечено', re: null}
 };
+
+const INACTIVE_COLOR = '#64748b';
+const HINT_RE = /(?<![а-яёa-z])(?:диам\S*|мцд|[dд])\s*-?\s*([1-4])(?!\d)/i;
+const HINT_STRIP = new RegExp(HINT_RE.source, 'gi');
+const ROUTE_RE = /(?<![а-яё])(?:со?|от|между)\s+(?:станции\s+)?(.+?)\s+(?:до|и)\s+(?:станции\s+)?(.+)$/i;
 
 function norm(s) {
   return s.toLowerCase().replace(/ё/g, 'е').replace(/[^а-яa-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1789,21 +1805,20 @@ function lev(a, b) {
 
 const tolerance = n => n <= 4 ? 0 : n <= 7 ? 1 : n <= 11 ? 2 : 3;
 
-function findStation(locRaw) {
-  const s = locRaw.replace(/^[^:]*:\s*/, '');
-  const hintMatch = s.match(/(?:диам\S*|мцд|d)\s*-?\s*([1-4])/i);
-  const hint = hintMatch ? `D${hintMatch[1]}` : null;
+function findStation(s) {
+  const m = s.match(HINT_RE);
+  const hint = m ? `D${m[1]}` : /(?<![а-яё])яр(?![а-яё])|ярослав/i.test(s) ? 'Ryar' : null;
+  const stripped = s.replace(/\([^)]*\)/g, ' ');
   const clean = p => p
-    .replace(/(?:диам\S*|мцд)\s*-?\s*\d/gi, '')
-    .replace(/\d+\s*км/gi, '')
+    .replace(HINT_STRIP, ' ')
+    .replace(/\d+\s*км/gi, ' ')
     .replace(/^\s*(?:(?:на|в|у|около|рядом\s+со?)\s+)?(?:станци\S*|платформ\S*|ст\.)\s+/i, '')
     .trim();
-  const candidates = [...s.split(/[,;()]/).map(clean), clean(s)].map(norm).filter(q => q.length >= 3);
+  const candidates = [...stripped.split(/[,;]/).map(clean), clean(stripped)].map(norm).filter(q => q.length >= 3);
   let best = null;
   let bestScore = Infinity;
   candidates.forEach(q => {
-    ALL_STATIONS.forEach(st => {
-      const n = st.norm;
+    ALL_STATIONS.forEach(st => st.norms.forEach(n => {
       const d = Math.min(lev(q, n), q.length > n.length ? lev(q.slice(0, n.length), n) + 1 : Infinity);
       if (d > tolerance(n.length)) return;
       const score = d * 10 - (hint && st.lines.includes(hint) ? 5 : 0) - (st.lines.some(c => lineRank(LINES[c]) === 0) ? 1 : 0);
@@ -1811,24 +1826,71 @@ function findStation(locRaw) {
         bestScore = score;
         best = st;
       }
-    });
+    }));
   });
   return best;
 }
 
+function routePath(a, b) {
+  const code = a.lines.find(c => b.lines.includes(c));
+  if (!code) return null;
+  const list = LINES[code].stations;
+  const i = list.findIndex(st => st.name === a.name);
+  const j = list.findIndex(st => st.name === b.name);
+  if (i < 0 || j < 0 || i === j) return null;
+  return list.slice(Math.min(i, j), Math.max(i, j) + 1).map(st => [st.lat, st.lng]);
+}
+
 function parseSightings(post) {
   if (!post.date || isNaN(post.date)) return [];
-  const text = post.text;
+  const text = post.text.replace(/\u00a0/g, ' ');
   const kindLine = (text.match(/👀\s*([^\n]+)/) || text.match(/замечен\S*\s+([^\n]+)/i) || [])[1];
   if (!kindLine) return [];
-  const locRaw = (text.match(/📍\s*([^\n]+)/) || text.match(/(?:на\s+платформе|на\s+станции|рядом\s+со?\s+(?:станци\S*|платформ\S*))\s*:?\s*([^\n]+)/i) || [])[1];
+  const locRaw = (text.match(/📍\s*([^\n]+)/) || text.match(/(?:на\s+платформе|на\s+станции|в\s+поезде|рядом\s+со?\s+(?:станци\S*|платформ\S*))\s*:?\s*([^\n]+)/i) || [])[1];
   if (!locRaw) return [];
-  const station = findStation(locRaw);
+  const s = locRaw.replace(/^[^:]*:\s*/, '');
+  let station = null;
+  let route = null;
+  const rm = s.match(ROUTE_RE);
+  if (rm) {
+    const a = findStation(rm[1]);
+    const b = findStation(rm[2]);
+    if (a && b) {
+      route = routePath(a, b);
+      if (route) {
+        const mid = route[Math.floor(route.length / 2)];
+        station = {name: `${a.name} — ${b.name}`, lat: mid[0], lng: mid[1], lines: []};
+      } else {
+        station = b;
+      }
+    } else {
+      station = a || b;
+    }
+  }
+  if (!station) station = findStation(s);
   if (!station) return [];
   const kinds = Object.keys(KINDS).filter(k => KINDS[k].re && KINDS[k].re.test(kindLine));
   const note = (text.match(/\u2139\uFE0F?\s*([^\n]+)/) || [])[1] || '';
   const confirmed = /подтвержд/i.test(text);
-  return (kinds.length ? kinds : ['other']).map(kind => ({kind, station, note, confirmed, date: post.date}));
+  return (kinds.length ? kinds : ['other']).map(kind => ({kind, station, route, note, confirmed, date: post.date}));
+}
+
+function syncStore(list) {
+  const now = Date.now();
+  const ids = new Set(list.map(p => p.id).filter(Boolean));
+  if (!ids.size) return;
+  const minId = Math.min(...ids);
+  list.forEach(p => { if (p.id) postStore.set(p.id, {post: p, missed: 0, deletedAt: 0}); });
+  postStore.forEach((entry, id) => {
+    const date = entry.post.date;
+    if (!date || isNaN(date) || now > date.getTime() + ACTIVE_MS + OLD_GRACE) {
+      postStore.delete(id);
+      return;
+    }
+    if (ids.has(id) || id < minId) return;
+    entry.missed++;
+    if (entry.missed >= 2 && !entry.deletedAt) entry.deletedAt = now;
+  });
 }
 
 const sightLayer = L.layerGroup().addTo(map);
@@ -1848,15 +1910,25 @@ function makeBadge(label, color) {
   return b;
 }
 
+const sightColor = sg => sg.inactive ? INACTIVE_COLOR : `hsl(${Math.round(Math.min(sg.age / ACTIVE_MS, 1) * 50)} 88% 56%)`;
+
 function openSightingSheet(sg) {
   const hadSelection = Boolean(state.selected);
   state.selected = null;
   state.focus = sg.station;
   $('sheetTitle').textContent = sg.station.name;
-  const badges = [makeBadge(KINDS[sg.kind].label, KINDS[sg.kind].color)];
-  if (sg.confirmed) badges.push(makeBadge('Подтверждено', '#34d399'));
+  const badges = [makeBadge(KINDS[sg.kind].label, sightColor(sg))];
+  if (sg.inactive) badges.push(makeBadge('Неактивна', INACTIVE_COLOR));
+  else if (sg.confirmed) badges.push(makeBadge('Подтверждено', '#34d399'));
   sheetBadges.replaceChildren(...badges);
-  $('sheetDesc').textContent = sg.note || 'Без уточнений';
+  const lines = [];
+  if (sg.inactive) {
+    const left = Math.max(1, Math.ceil((sg.removeAt - Date.now()) / 60000));
+    const reason = sg.deleted ? 'сообщение удалено из канала' : 'прошло больше 2 часов';
+    lines.push(`Неактивна: ${reason}. Метка пропадёт через ${left} мин.`);
+  }
+  lines.push(sg.note || 'Без уточнений');
+  $('sheetDesc').textContent = lines.join('\n');
   $('sheetMeta').textContent = agoText(sg.age);
   stationSheet.classList.add('open');
   if (hadSelection) updateStations();
@@ -1866,30 +1938,40 @@ function renderSightings() {
   sightLayer.clearLayers();
   if (!state.sightings) return;
   const now = Date.now();
+  const items = [];
+  postStore.forEach(({post, deletedAt}) => parseSightings(post).forEach(sg => {
+    const removeAt = Math.min(sg.date.getTime() + ACTIVE_MS + OLD_GRACE, deletedAt ? deletedAt + DELETE_GRACE : Infinity);
+    if (now >= removeAt) return;
+    const age = Math.max(0, now - sg.date.getTime());
+    items.push({...sg, age, removeAt, deleted: Boolean(deletedAt), inactive: Boolean(deletedAt) || age >= ACTIVE_MS});
+  }));
+  items.sort((x, y) => x.age - y.age);
   const seen = new Set();
   const groups = new Map();
-  channelPosts.forEach(post => parseSightings(post).forEach(sg => {
-    const age = Math.max(0, now - sg.date);
+  items.forEach(sg => {
     const stKey = `${sg.station.name}|${sg.station.lat}`;
     const key = `${sg.kind}|${stKey}`;
-    if (age > SIGHT_TTL || seen.has(key)) return;
+    if (seen.has(key)) return;
     seen.add(key);
-    groups.set(stKey, [...(groups.get(stKey) || []), {...sg, age}]);
-  }));
+    groups.set(stKey, [...(groups.get(stKey) || []), sg]);
+  });
   groups.forEach(group => group.forEach((sg, i) => {
-    const kind = KINDS[sg.kind];
+    const color = sightColor(sg);
     const dx = (i - (group.length - 1) / 2) * 38;
+    if (sg.route && i === 0) {
+      L.polyline(sg.route, {color, weight: 5, opacity: sg.inactive ? 0.5 : 0.9, dashArray: '1 9', lineCap: 'round', interactive: false}).addTo(sightLayer);
+    }
     const icon = L.divIcon({
       className: 'sight-icon',
-      html: `<div class="sight" style="--c:${kind.color}"><span class="sight-body">${ICONS[sg.kind](kind.color)}</span></div>`,
+      html: `<div class="sight" style="--c:${color}"><span class="sight-body">${ICONS[sg.kind](color)}</span></div>`,
       iconSize: [36, 44],
       iconAnchor: [18 - dx, 41]
     });
     L.marker([sg.station.lat, sg.station.lng], {
       icon,
       keyboard: false,
-      zIndexOffset: 1000,
-      opacity: sg.age < 3600000 ? 1 : sg.age < 7200000 ? 0.85 : 0.7
+      zIndexOffset: sg.inactive ? 500 : 1000,
+      opacity: sg.inactive ? 0.8 : 1
     }).on('click', () => openSightingSheet(sg)).addTo(sightLayer);
   }));
 }
@@ -1931,10 +2013,13 @@ function parsePosts(html) {
     }
     const photo = wrap.querySelector('.tgme_widget_message_photo_wrap');
     const img = photo && (photo.getAttribute('style') || '').match(/url\(['"]?([^'")]+)/);
+    const postAttr = wrap.querySelector('[data-post]');
+    const id = postAttr ? Number((postAttr.getAttribute('data-post') || '').split('/').pop()) : 0;
     const dateLink = wrap.querySelector('.tgme_widget_message_date');
     const time = wrap.querySelector('time');
     if (!text && !img) return;
     result.push({
+      id,
       text,
       img: img ? img[1] : '',
       href: dateLink ? dateLink.getAttribute('href') : '',
@@ -1994,6 +2079,7 @@ async function refreshPosts() {
   postsLoading = true;
   try {
     channelPosts = parsePosts(await fetchChannelHtml(TG_CHANNEL));
+    syncStore(channelPosts);
     postsLoadedAt = Date.now();
     postsFailed = false;
   } catch {
