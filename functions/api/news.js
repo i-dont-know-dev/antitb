@@ -1,28 +1,8 @@
-/**
- * Cloudflare Worker для проксирования Telegram канала
- * 
- * Развертывание (бесплатно):
- * 1. Зарегистрируйся на https://dash.cloudflare.com (если ещё нет аккаунта)
- * 2. Слева в меню выбери "Workers & Pages"
- * 3. Нажми "Create application" → "Create Worker"
- * 4. Дай имя, например "antitb-news", нажми "Deploy"
- * 5. Нажми "Edit code" и вставь СОДЕРЖИМОЕ ЭТОГО ФАЙЛА
- * 6. Нажми "Save and deploy"
- * 7. Скопируй URL воркера (вида https://antitb-news.<твой-субдомен>.workers.dev)
- * 8. Вставь этот URL в index.html в константу WORKER_URL
- * 
- * Альтернатива через Wrangler CLI:
- *   npm install -g wrangler
- *   wrangler login
- *   wrangler deploy worker.js --name antitb-news
- */
-
 const CHANNEL = 'gdeseychastbiliantiki';
-const CACHE_TTL = 30; // секунды
+const CACHE_TTL = 30; // blb yf[eq
 
 export default {
   async fetch(request, env, ctx) {
-    // Обработка CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
@@ -64,7 +44,6 @@ export default {
         body = text;
         ok = true;
       } catch (e) {
-        // пробуем следующий UA
       }
     }
 
