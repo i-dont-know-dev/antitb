@@ -58,6 +58,9 @@ button,input{font:inherit;color:inherit}
   background:var(--bg)!important;
   font-family:var(--font)!important;
 }
+.leaflet-tile-pane{
+  filter:hue-rotate(200deg) saturate(0.6) brightness(0.85) contrast(1.1);
+}
 .leaflet-control-attribution{
   font-size:10px!important;
   background:rgba(11,18,36,.85)!important;
@@ -1089,6 +1092,59 @@ Object.entries(RAIL_SRC).forEach(([code, r]) => {
   };
 });
 
+const MCK_SRC = {
+  Mck: {name: 'МЦК — Московское центральное кольцо', color: '#ffffff', s: `Крымская,55.6120,37.5980
+Площадь Гагарина,55.7100,37.5570
+Лужники,55.7140,37.5540
+Кутузовская,55.7405,37.5335
+Деловой центр,55.7480,37.5370
+Москва-Сити,55.7490,37.5390
+Шелепиха,55.7580,37.5450
+Хорошёвская,55.7780,37.5270
+Зорге,55.7940,37.5240
+Петровский парк,55.7980,37.5530
+Беговая,55.7735,37.5477
+Нижняя Масловка,55.7980,37.5800
+Светлановский,55.8180,37.5820
+Окружная,55.8468,37.5714
+Лихоборы,55.8475,37.5535
+Ховрино,55.8778,37.4868
+Молжаниново,55.9214,37.3862
+Белокаменная,55.8300,37.7200
+Бульвар Рокоссовского,55.8100,37.7400
+Локомотив,55.7800,37.7500
+Измайлово,55.7800,37.7800
+Соколиная Гора,55.7550,37.7800
+Шоссе Энтузиастов,55.7500,37.7900
+Андроновка,55.7412,37.7375
+Нижегородская,55.7322,37.7285
+Угрешская,55.7200,37.7300
+Дубровка,55.7300,37.6700
+Автозаводская,55.7040,37.6700
+ЗИЛ,55.6900,37.6600
+Верхние Котлы,55.6897,37.6672
+Крымская,55.6120,37.5980`},
+  AeroSVO: {name: 'Аэроэкспресс — Шереметьево', color: '#ef4444', s: `Савёловская,55.7942,37.5882
+Шереметьево,55.9726,37.4146`},
+  AeroVKO: {name: 'Аэроэкспресс — Внуково', color: '#ef4444', s: `Киевская,55.7438,37.5144
+Аэропорт Внуково,55.5915,37.2615`},
+  AeroDME: {name: 'Аэроэкспресс — Домодедово', color: '#ef4444', s: `Москва-Павелецкая,55.7297,37.6397
+Аэропорт Домодедово,55.4147,37.9020`}
+};
+
+Object.entries(MCK_SRC).forEach(([code, r]) => {
+  LINES[code] = {
+    name: r.name,
+    title: r.name,
+    color: r.color,
+    rail: true,
+    stations: r.s.split('\n').map(row => {
+      const [name, lat, lng] = row.split(',');
+      return {name, lat: Number(lat), lng: Number(lng)};
+    })
+  };
+});
+
 const TRUNK_SRC = {
   Tspb: {name: 'Москва — Санкт-Петербург', color: '#ff7043', s: `Тверь,56.8506,35.8892
 Лихославль,57.1250,35.4700
@@ -1705,15 +1761,24 @@ map.on('resize', () => map.setMinZoom(2.5));
 
 map.attributionControl.setPrefix(false);
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+const baseLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
   minZoom: 2,
-  maxZoom: 19,
+  maxZoom: 16,
   keepBuffer: 3,
   updateWhenZooming: false,
   updateInterval: 100,
   crossOrigin: true,
-  subdomains: 'abcd',
-  attribution: '&copy; OpenStreetMap &copy; CARTO'
+  attribution: 'Tiles &copy; Esri'
+}).addTo(map);
+
+const refLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+  minZoom: 2,
+  maxZoom: 16,
+  keepBuffer: 3,
+  updateWhenZooming: false,
+  updateInterval: 100,
+  crossOrigin: true,
+  pane: 'overlayPane'
 }).addTo(map);
 
 (window.requestIdleCallback || (cb => setTimeout(cb, 1500)))(() => {
