@@ -2509,30 +2509,45 @@ function openSightingSheet(sg) {
   state.focus = sg.station;
   $('sheetTitle').textContent = sg.station.name;
   const color = sightColor(sg);
-  const badges = [makeBadge(KINDS[sg.kind].label, color)];
+  const kindName = KINDS[sg.kind].label;
+  
+  // Бейджи: кто стоит + статус
+  const badges = [makeBadge(kindName, color)];
+  let statusText = '';
   if (sg.deleted) {
     badges.push(makeBadge('Удалено', INACTIVE_COLOR));
+    statusText = 'Сообщение удалено из канала';
+  } else if (sg.expired) {
+    badges.push(makeBadge('Просрочено', INACTIVE_COLOR));
+    statusText = 'Метка просрочена (старше 2.5 часов)';
   } else if (sg.age >= FADE_MS) {
     badges.push(makeBadge('Неактивна', INACTIVE_COLOR));
+    statusText = 'Прошло больше 2 часов — метка неактивна';
   } else if (sg.age >= ACTIVE_MS) {
     badges.push(makeBadge('Старая', 'hsl(45 95% 55%)'));
-  } else if (sg.confirmed) {
-    badges.push(makeBadge('Подтверждено', '#34d399'));
+    statusText = 'Прошло больше 2 часов';
+  } else {
+    badges.push(makeBadge('Активна', color));
+    statusText = 'Свежая метка';
   }
+  if (sg.confirmed) badges.push(makeBadge('✓ Подтверждено', '#34d399'));
+  if (sg.route) badges.push(makeBadge('Маршрут', '#3b82f6'));
   sheetBadges.replaceChildren(...badges);
+  
+  // Описание: кто, что, где, когда
   const lines = [];
-  if (sg.deleted) {
-    const left = Math.max(1, Math.ceil((sg.removeAt - Date.now()) / 60000));
-    lines.push(`Сообщение удалено из канала. Метка пропадёт через ${left} мин.`);
-  } else if (sg.age >= FADE_MS) {
-    const left = Math.max(1, Math.ceil((sg.removeAt - Date.now()) / 60000));
-    lines.push(`Неактивна: прошло больше 2 часов. Метка пропадёт через ${left} мин.`);
-  } else if (sg.age >= ACTIVE_MS) {
-    lines.push(`Старая метка: прошло больше 2 часов.`);
+  lines.push(`Кто: ${kindName}`);
+  if (sg.route) {
+    lines.push(`Движение: по маршруту`);
   }
-  lines.push(sg.note || 'Без уточнений');
+  lines.push(`Где: ${sg.station.name}`);
+  lines.push(`Статус: ${statusText}`);
+  if (sg.note) {
+    lines.push('');
+    lines.push(`ℹ️ ${sg.note}`);
+  }
   $('sheetDesc').textContent = lines.join('\n');
-  $('sheetMeta').textContent = agoText(sg.age);
+  $('sheetMeta').textContent = `${agoText(sg.age)} · ${sg.station.lat.toFixed(4)}, ${sg.station.lng.toFixed(4)}`;
   stationSheet.classList.add('open');
   if (hadSelection) updateStations();
 }
@@ -2603,17 +2618,11 @@ function renderSightings() {
         L.polyline(sg.route, {color, weight: 5, opacity: faded ? 0.4 : 0.9, dashArray: '1 9', lineCap: 'round', interactive: false}).addTo(sightLayer);
       }
       const countBadge = showCount ? `<div class="sight-count">${i + 1}</div>` : '';
-      const kindLabel = KINDS[sg.kind].label;
       const icon = L.divIcon({
         className: 'sight-icon',
-        html: `<div class="sight" style="--c:${color}">
-          <div class="sight-pin">
-            <span class="sight-body">${ICONS[sg.kind](color)}</span>${countBadge}
-          </div>
-          <div class="sight-label">${kindLabel}</div>
-        </div>`,
-        iconSize: [60, 68],
-        iconAnchor: [30 - dx, 60]
+        html: `<div class="sight" style="--c:${color}"><span class="sight-body">${ICONS[sg.kind](color)}</span>${countBadge}</div>`,
+        iconSize: [40, 50],
+        iconAnchor: [20 - dx, 46]
       });
       L.marker([sg.station.lat, sg.station.lng], {
         icon,
