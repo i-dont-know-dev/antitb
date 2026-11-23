@@ -364,7 +364,7 @@ button,input{font:inherit;color:inherit}
 .sight-body{position:absolute;top:0;left:0;z-index:1;width:40px;height:40px;border-radius:50%;background:var(--surface);border:2.5px solid var(--c);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 .sight-body svg{width:24px;height:24px}
 .sight-count{position:absolute;top:-2px;right:-2px;z-index:2;min-width:18px;height:18px;border-radius:9px;background:var(--primary);color:var(--on-primary);font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px;border:2px solid var(--surface)}
- 
+/* SVG иконки поездов (вид сбоку) */
 .train-icon{background:transparent;border:0}
 .train-marker{display:flex;flex-direction:column;align-items:center;gap:1px}
 .train-svg{display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
@@ -1427,12 +1427,11 @@ try {
 }
 
 const TG_CHANNEL = 'gdeseychastbiliantiki';
-
 const WORKER_URL = 'https://antitb-news.alik3ckx.workers.dev';
 const NEWS_LIMIT = 40;
 const FETCH_TTL = 45000;
-const ACTIVE_MS = 2 * 60 * 60 * 1000;   
-const FADE_MS = 4 * 60 * 60 * 1000;    
+const ACTIVE_MS = 2 * 60 * 60 * 1000;   // 2 часа — метка «активна» (красная)
+const FADE_MS = 4 * 60 * 60 * 1000;    // 4 часа — метка «старая» (жёлтая)
 
 const TRAIN_SCHEDULES = [
   {
@@ -1527,6 +1526,11 @@ const TRAIN_SCHEDULES = [
   },
 ];
 
+// SVG иконки поездов (вид сбоку) — цвета по типу состава
+// ЭП2Д: белый + красный + жёлтый + оранжевый
+// Иволга: белый + синий + красный
+// Фирменный экспресс: серый + оранжевый
+// ЭД4М: белый + оранжевый
 const TRAIN_SVG = {
   ep2d: (rot = 0) => `<svg class="train-svg" width="48" height="20" viewBox="0 0 48 20" style="transform:rotate(${rot}deg)"><defs><linearGradient id="ep2d-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0f3f6"/><stop offset="1" stop-color="#d8dde2"/></linearGradient></defs><rect x="2" y="4" width="40" height="11" rx="2" fill="url(#ep2d-body)" stroke="#9aa0a6" stroke-width="0.5"/><path d="M42 4 L46 9.5 L42 15 Z" fill="#f08a1c"/><rect x="42" y="7" width="3" height="5" fill="#e8452a"/><rect x="2" y="13.5" width="40" height="1.5" fill="#4a4d52"/><rect x="3" y="9" width="40" height="0.8" fill="#f08a1c"/><rect x="3" y="9.8" width="40" height="0.3" fill="#f6c431"/><rect x="3" y="10.5" width="40" height="0.3" fill="#d92f2a"/><circle cx="8" cy="16" r="2.2" fill="#2a2e34"/><circle cx="8" cy="16" r="1" fill="#5a6068"/><circle cx="36" cy="16" r="2.2" fill="#2a2e34"/><circle cx="36" cy="16" r="1" fill="#5a6068"/><rect x="6" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="12" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="18" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="24" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="30" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="36" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/></svg>`,
   ivo: (rot = 0) => `<svg class="train-svg" width="48" height="20" viewBox="0 0 48 20" style="transform:rotate(${rot}deg)"><defs><linearGradient id="ivo-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f9fb"/><stop offset="1" stop-color="#e0e5ea"/></linearGradient></defs><path d="M2 4 L42 4 L46 10 L42 15 L2 15 Z" fill="url(#ivo-body)" stroke="#b0b8c0" stroke-width="0.5"/><path d="M2 4 L42 4 L46 10 L42 15 L2 15 Z" fill="none" stroke="#d6212b" stroke-width="2.5"/><rect x="2" y="12" width="44" height="3" fill="#1c4f9c"/><rect x="2" y="11.8" width="44" height="0.4" fill="#ffffff"/><circle cx="8" cy="16" r="2.2" fill="#2a2e34"/><circle cx="8" cy="16" r="1" fill="#5a6068"/><circle cx="36" cy="16" r="2.2" fill="#2a2e34"/><circle cx="36" cy="16" r="1" fill="#5a6068"/><rect x="6" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/><rect x="13" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/><rect x="20" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/><rect x="27" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/><rect x="34" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/></svg>`,
@@ -1541,6 +1545,7 @@ const TRAIN_LABELS = {
   ed4m: 'ЭД4М',
 };
 
+
 const TRAIN_LINE_COLORS = {
   'МЦД-1': '#f6a600', 'МЦД-2': '#e74280', 'МЦД-3': '#e95b0c', 'МЦД-4': '#40b280',
   'Ярославское': '#1e88e5', 'Павелецкое': '#7cb342', 'Киевское': '#1a237e',
@@ -1549,9 +1554,9 @@ const TRAIN_LINE_COLORS = {
   'Аэропорт Домодедово': '#558b2f',
 };
 
-const TRAIN_MIN_ZOOM = 11;  
-const TRAIN_UPDATE_MS = 5000;  
-const MAX_AGE_MS = 8 * 60 * 60 * 1000;  
+const TRAIN_MIN_ZOOM = 11;  // поезда появляются при зуме 11+
+const TRAIN_UPDATE_MS = 5000;  // обновление позиций каждые 5 сек
+const MAX_AGE_MS = 8 * 60 * 60 * 1000;  // 8 часов — метка исчезает
 const OLD_GRACE = 30 * 60 * 1000;
 const DELETE_GRACE = 10 * 60 * 1000;
 const MCD_CENTER = [55.755, 37.62];
@@ -1947,12 +1952,12 @@ chips.forEach(chip => chip.addEventListener('click', () => {
 }));
 
 const PROXIES = [
-  
-  
-  
-  
+  // 1. Свой Cloudflare Worker — ЕДИНСТВЕННЫЙ НАДЁЖНЫЙ СПОСОБ
+  //    Telegram блокирует запросы из браузера (нет CORS заголовков).
+  //    Публичные прокси (allorigins, corsproxy, codetabs) сейчас мертвы.
+  //    Задеплой worker.js как Cloudflare Worker и вставь URL в WORKER_URL.
   ...(WORKER_URL ? [{url: () => WORKER_URL, timeout: 15000}] : []),
-  
+  // 2. Cloudflare Pages Function (если хостинг на Pages и functions/api/news.js задеплоен)
   {url: () => '/api/news', timeout: 15000}
 ];
 const newsList = $('newsList');
@@ -2075,7 +2080,7 @@ function routePath(a, b) {
 function parseSightings(post) {
   if (!post.date || isNaN(post.date)) return [];
   const fullText = post.text.replace(/\u00a0/g, ' ');
-  
+  // Разбиваем на блоки по заголовку "Где сейчас" или по 👀 — на случай если в посте несколько меток
   const blocks = fullText.split(/(?=Где\s+сейчас|👀)/i).filter(b => b.includes('👀') || /замечен/i.test(b));
   if (!blocks.length) {
     blocks.push(fullText);
@@ -2129,22 +2134,22 @@ function syncStore(list) {
       postStore.delete(id);
       return;
     }
-    
+    // Удаляем только совсем старые посты (> MAX_AGE_MS = 8 часов)
     if (now > date.getTime() + MAX_AGE_MS) {
       postStore.delete(id);
       return;
     }
-    
+    // Если пост в списке — сбрасываем счётчик пропусков
     if (ids.has(id)) {
       entry.missed = 0;
       entry.deletedAt = 0;
       return;
     }
-    
+    // Если пост моложе MAX_AGE_MS и его нет в выдаче — скорее всего прокси вернул не все посты
     if (now < date.getTime() + MAX_AGE_MS) return;
-    
+    // Если id меньше minId — пост старый, Telegram его не отдаёт, не помечаем
     if (id < minId) return;
-    
+    // Если id больше maxId — это новый пост, которого мы не видели, игнорируем
     if (id > maxId) return;
     entry.missed++;
     if (entry.missed >= 3 && !entry.deletedAt) entry.deletedAt = now;
@@ -2154,6 +2159,8 @@ function syncStore(list) {
 const sightLayer = L.layerGroup().addTo(map);
 const trainLayer = L.layerGroup().addTo(map);
 
+// === СИСТЕМА ПОЕЗДОВ ===
+// Находит координаты станции по имени из расписания
 function findTrainStation(name) {
   const norm = n => n.toLowerCase().replace(/ё/g, 'е').replace(/[^а-яa-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
   const target = norm(name);
@@ -2162,7 +2169,7 @@ function findTrainStation(name) {
       if (n === target) return st;
     }
   }
-  
+  // Поиск с допуском (Levenshtein)
   let best = null, bestScore = Infinity;
   for (const st of ALL_STATIONS) {
     for (const n of st.norms) {
@@ -2176,10 +2183,11 @@ function findTrainStation(name) {
   return best;
 }
 
+// Находит путь между станциями по линии МЦД
 function findTrainPath(stops) {
   const points = [];
   const lineCode = stops[0] && stops[0].station;
-  
+  // Пытаемся найти линию, содержащую все станции
   for (const [code, line] of Object.entries(LINES)) {
     const stations = line.stations.map(s => s.name);
     let allFound = true;
@@ -2201,7 +2209,7 @@ function findTrainPath(stops) {
       };
     }
   }
-  
+  // Fallback: просто соединяем найденные станции прямыми линиями
   const coords = [];
   const stationIndices = [];
   for (const stop of stops) {
@@ -2214,12 +2222,14 @@ function findTrainPath(stops) {
   return { coords, lineCode: null, lineName: null, stationIndices };
 }
 
+// Парсит время "HH:MM" в минуты от полуночи
 function parseTime(t) {
   if (!t) return null;
   const m = t.match(/^(\d{1,2}):(\d{2})$/);
   return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
 }
 
+// Вычисляет позицию поезда в данный момент времени
 function computeTrainPosition(schedule, now) {
   const nowMin = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
   const stops = schedule.stops;
@@ -2229,12 +2239,12 @@ function computeTrainPosition(schedule, now) {
     return null;
   }
 
-  
+  // Время отправления и прибытия
   const startMin = parseTime(stops[0].departure);
   const endMin = parseTime(stops[stops.length - 1].arrival);
   if (startMin === null || endMin === null) return null;
 
-  
+  // Поезд ещё не начал маршрут — показываем на станции отправления
   if (nowMin < startMin) {
     return {
       lat: path.coords[0][0], lng: path.coords[0][1],
@@ -2243,7 +2253,7 @@ function computeTrainPosition(schedule, now) {
       path, departsIn: startMin - nowMin
     };
   }
-  
+  // Поезд уже завершил маршрут — показываем на конечной
   if (nowMin >= endMin) {
     const lastIdx = path.coords.length - 1;
     return {
@@ -2253,14 +2263,14 @@ function computeTrainPosition(schedule, now) {
     };
   }
 
-  
+  // Поезд в пути — интерполируем между остановками
   let prevStopIdx = 0;
   for (let i = 0; i < stops.length - 1; i++) {
     const segStart = parseTime(stops[i].departure) || parseTime(stops[i].arrival);
     const segEnd = parseTime(stops[i + 1].arrival);
     if (segStart === null || segEnd === null) continue;
     if (nowMin >= segStart && nowMin < segEnd) {
-      
+      // Стоит на станции (dwell time)
       const arrivalTime = parseTime(stops[i].arrival);
       const departureTime = parseTime(stops[i].departure);
       if (arrivalTime && departureTime && nowMin >= arrivalTime && nowMin < departureTime) {
@@ -2272,11 +2282,11 @@ function computeTrainPosition(schedule, now) {
           path, departsIn: departureTime - nowMin
         };
       }
-      
+      // Движется между станциями
       const segProgress = (nowMin - segStart) / (segEnd - segStart);
       const startIdx = path.stationIndices[i] || 0;
       const endIdx = path.stationIndices[i + 1] || (path.coords.length - 1);
-      
+      // Интерполируем по пути между startIdx и endIdx
       const subProgress = startIdx + segProgress * (endIdx - startIdx);
       const lo = Math.floor(subProgress);
       const hi = Math.min(lo + 1, path.coords.length - 1);
@@ -2342,7 +2352,7 @@ function renderTrains() {
     const pos = computeTrainPosition(schedule, now);
     if (!pos) continue;
     
-    
+    // Направление движения (для поворота иконки)
     let rot = 0;
     if (pos.path.coords.length >= 2) {
       const idx = Math.floor(pos.progress * (pos.path.coords.length - 1));
@@ -2352,7 +2362,7 @@ function renderTrains() {
       const dLng = lng2 - lng1;
       const dLat = lat2 - lat1;
       if (Math.abs(dLng) > 0.0001 || Math.abs(dLat) > 0.0001) {
-        
+        // Находим угол в пикселях экрана
         const p1 = map.latLngToLayerPoint([lat1, lng1]);
         const p2 = map.latLngToLayerPoint([lat2, lng2]);
         rot = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
@@ -2397,11 +2407,12 @@ function makeBadge(label, color) {
   return b;
 }
 
+// Цвет метки: < 2ч — красная (активная), 2-4ч — жёлтая (старая), 4-8ч — серая (неактивная)
 const sightColor = sg => {
   if (sg.deleted) return INACTIVE_COLOR;
-  if (sg.age >= FADE_MS) return INACTIVE_COLOR;  
-  if (sg.age >= ACTIVE_MS) return `hsl(45 95% 55%)`;  
-  return `hsl(${Math.round(Math.min(sg.age / ACTIVE_MS, 1) * 50)} 88% 56%)`;  
+  if (sg.age >= FADE_MS) return INACTIVE_COLOR;  // серая
+  if (sg.age >= ACTIVE_MS) return `hsl(45 95% 55%)`;  // жёлтая
+  return `hsl(${Math.round(Math.min(sg.age / ACTIVE_MS, 1) * 50)} 88% 56%)`;  // от красной до оранжевой
 };
 
 function openSightingSheet(sg) {
@@ -2479,7 +2490,7 @@ function renderSightings() {
   const now = Date.now();
   const items = [];
   postStore.forEach(({post, deletedAt}) => parseSightings(post).forEach(sg => {
-    
+    // Метка живёт MAX_AGE_MS (8 часов) или до удаления+DELETE_GRACE
     const removeAt = Math.min(sg.date.getTime() + MAX_AGE_MS, deletedAt ? deletedAt + DELETE_GRACE : Infinity);
     if (now >= removeAt) return;
     const age = Math.max(0, now - sg.date.getTime());
@@ -2496,7 +2507,7 @@ function renderSightings() {
     groups.set(stKey, [...(groups.get(stKey) || []), sg]);
   });
   groups.forEach(group => {
-    
+    // Если несколько меток на одной станции — показываем с счётчиком
     const showCount = group.length > 1;
     group.forEach((sg, i) => {
       const color = sightColor(sg);
@@ -2549,8 +2560,8 @@ async function fetchChannelHtml(channel) {
       });
       if (!res.ok) { lastErr = new Error(`HTTP ${res.status}`); continue; }
       const body = proxy.json ? (await res.json()).contents : await res.text();
-      
-      
+      // Строгая проверка: реальный ответ Telegram содержит data-post="канал/NNN"
+      // с реальным именем канала. В index.html этой строки НЕТ.
       const postMarker = `data-post="${channel}/`;
       if (!body || !body.includes(postMarker)) {
         lastErr = new Error('not a real telegram response');
@@ -2614,7 +2625,7 @@ function renderPosts(list) {
       t.textContent = post.text;
       card.append(t);
     }
-    if (/^https:\/\/t\.me\
+    if (/^https:\/\/t\.me\//.test(post.href)) {
       const a = document.createElement('a');
       a.className = 'news-link';
       a.href = post.href;
