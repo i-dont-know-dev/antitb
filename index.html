@@ -1705,14 +1705,15 @@ map.on('resize', () => map.setMinZoom(2.5));
 
 map.attributionControl.setPrefix(false);
 
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
   minZoom: 2,
-  maxZoom: 16,
+  maxZoom: 19,
   keepBuffer: 3,
   updateWhenZooming: false,
   updateInterval: 100,
   crossOrigin: true,
-  attribution: 'Tiles &copy; Esri'
+  subdomains: 'abcd',
+  attribution: '&copy; OpenStreetMap &copy; CARTO'
 }).addTo(map);
 
 (window.requestIdleCallback || (cb => setTimeout(cb, 1500)))(() => {
@@ -1763,23 +1764,30 @@ const lineRank = l => l.trunk ? 2 : l.rail ? 1 : 0;
 const linePolylines = {};
 const orderedLines = Object.entries(LINES).sort(([, a], [, b]) => lineRank(b) - lineRank(a));
 const polyOpts = {pane: 'linesPane', renderer: renderers.lines, lineJoin: 'round', lineCap: 'round', interactive: false};
-// Интерполяция промежуточных точек между станциями для плавных линий
-// Добавляет точки по дуге между каждыми двумя станциями, чтобы линия шла по путям, а не через дома
+// Интерполяция промежуточных точек между станциями для плавных кривых линий
+// Использует Catmull-Rom spline для плавных изгибов по реальным путям
 const interpolatePath = (stations) => {
+  if (stations.length < 2) return stations.map(s => [s.lat, s.lng]);
   const result = [];
-  for (let i = 0; i < stations.length; i++) {
-    result.push([stations[i].lat, stations[i].lng]);
-    if (i < stations.length - 1) {
-      const a = stations[i], b = stations[i + 1];
-      const dLat = b.lat - a.lat, dLng = b.lng - a.lng;
-      const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-      // Количество промежуточных точек зависит от расстояния
-      const steps = Math.max(2, Math.min(8, Math.round(dist * 50)));
-      for (let s = 1; s < steps; s++) {
-        const t = s / steps;
-        // Линейная интерполяция + лёгкое сглаживание (Catmull-Rom упрощённый)
-        result.push([a.lat + dLat * t, a.lng + dLng * t]);
-      }
+  // Catmull-Rom: для каждой пары точек используем соседние для расчёта касательных
+  const pts = stations.map(s => ({lat: s.lat, lng: s.lng}));
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const dist = Math.sqrt((p2.lat - p1.lat) ** 2 + (p2.lng - p1.lng) ** 2);
+    // Больше точек для длинных перегонов
+    const steps = Math.max(4, Math.min(20, Math.round(dist * 80)));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const t2 = t * t, t3 = t2 * t;
+      // Catmull-Rom формула
+      const lat = 0.5 * ((2 * p1.lat) + (-p0.lat + p2.lat) * t + (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * t2 + (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * t3);
+      const lng = 0.5 * ((2 * p1.lng) + (-p0.lng + p2.lng) * t + (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * t2 + (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * t3);
+      // Избегаем дубликатов
+      if (s === 0 && result.length > 0) continue;
+      result.push([lat, lng]);
     }
   }
   return result;
@@ -2162,8 +2170,8 @@ function syncStore(list) {
       postStore.delete(id);
       return;
     }
-    // Удаляем только совсем старые посты (> MAX_AGE_MS = 8 часов)
-    if (now > date.getTime() + MAX_AGE_MS) {
+    // Удаляем только очень старые посты (> 24 часов) — чтобы последние 3 всегда были доступны
+    if (now > date.getTime() + 24 * 60 * 60 * 1000) {
       postStore.delete(id);
       return;
     }
@@ -2173,8 +2181,8 @@ function syncStore(list) {
       entry.deletedAt = 0;
       return;
     }
-    // Если пост моложе MAX_AGE_MS и его нет в выдаче — скорее всего прокси вернул не все посты
-    if (now < date.getTime() + MAX_AGE_MS) return;
+    // Если пост моложе 24 часов и его нет в выдаче — скорее всего прокси вернул не все посты
+    if (now < date.getTime() + 24 * 60 * 60 * 1000) return;
     // Если id меньше minId — пост старый, Telegram его не отдаёт, не помечаем
     if (id < minId) return;
     // Если id больше maxId — это новый пост, которого мы не видели, игнорируем
@@ -2239,8 +2247,8 @@ function findTrainPath(stops) {
         if (i < pathStations.length - 1) {
           const a = pathStations[i], b = pathStations[i + 1];
           const dist = Math.sqrt((b.lat - a.lat) ** 2 + (b.lng - a.lng) ** 2);
-          const steps = Math.max(2, Math.min(8, Math.round(dist * 50)));
-          idx += steps;
+          const steps = Math.max(4, Math.min(20, Math.round(dist * 80)));
+          idx += steps + 1;
         }
       }
       return {
@@ -2441,7 +2449,7 @@ function makeBadge(label, color) {
 
 // Цвет метки: < 2ч — красная (активная), 2-2.5ч — жёлтая (старая), потом исчезает
 const sightColor = sg => {
-  if (sg.deleted) return INACTIVE_COLOR;
+  if (sg.deleted || sg.expired) return INACTIVE_COLOR;
   if (sg.age >= FADE_MS) return INACTIVE_COLOR;  // серая
   if (sg.age >= ACTIVE_MS) return `hsl(45 95% 55%)`;  // жёлтая
   return `hsl(${Math.round(Math.min(sg.age / ACTIVE_MS, 1) * 50)} 88% 56%)`;  // от красной до оранжевой
@@ -2500,14 +2508,7 @@ function updateSightStatus() {
   const active = sightCount;
   let warn = '';
   if (channelPosts.length && !sightCount) {
-    const ageMs = last ? Date.now() - last.getTime() : 0;
-    if (ageMs > MAX_AGE_MS) {
-      warn = ' Все посты старше 2.5 часов — метки не отображаются.';
-    } else if (ageMs > ACTIVE_MS) {
-      warn = ' Свежих постов (< 2ч) нет — все метки старые/неактивные.';
-    } else {
-      warn = ' Метки должны быть. Если их нет — проверьте парсер.';
-    }
+    warn = ' Нет активных меток — показаны последние 3 (серые).';
   }
   el.textContent = `Постов: ${channelPosts.length}. Последний: ${lastText}. Меток: ${active}.${warn}`;
 }
@@ -2522,16 +2523,21 @@ function renderSightings() {
   const now = Date.now();
   const items = [];
   postStore.forEach(({post, deletedAt}) => parseSightings(post).forEach(sg => {
-    // Метка живёт MAX_AGE_MS (8 часов) или до удаления+DELETE_GRACE
     const removeAt = Math.min(sg.date.getTime() + MAX_AGE_MS, deletedAt ? deletedAt + DELETE_GRACE : Infinity);
-    if (now >= removeAt) return;
     const age = Math.max(0, now - sg.date.getTime());
-    items.push({...sg, age, removeAt, deleted: Boolean(deletedAt)});
+    // Помечаем как "просроченную" но оставляем в списке для показа последних 3
+    const expired = now >= removeAt;
+    items.push({...sg, age, removeAt, deleted: Boolean(deletedAt), expired});
   }));
   items.sort((x, y) => x.age - y.age);
+  
+  // Если нет активных меток (< MAX_AGE_MS), показываем последние 3 сообщения
+  const activeItems = items.filter(sg => sg.age < MAX_AGE_MS && !sg.deleted && !sg.expired);
+  const itemsToShow = activeItems.length > 0 ? activeItems : items.filter(sg => !sg.deleted).slice(0, 3);
+  
   const seen = new Set();
   const groups = new Map();
-  items.forEach(sg => {
+  itemsToShow.forEach(sg => {
     const stKey = `${sg.station.name}|${sg.station.lat}`;
     const key = `${sg.kind}|${stKey}`;
     if (seen.has(key)) return;
@@ -2544,7 +2550,7 @@ function renderSightings() {
     group.forEach((sg, i) => {
       const color = sightColor(sg);
       const dx = (i - (group.length - 1) / 2) * 42;
-      const faded = sg.deleted || sg.age >= FADE_MS;
+      const faded = sg.deleted || sg.expired || sg.age >= FADE_MS;
       if (sg.route && i === 0) {
         L.polyline(sg.route, {color, weight: 5, opacity: faded ? 0.4 : 0.9, dashArray: '1 9', lineCap: 'round', interactive: false}).addTo(sightLayer);
       }
