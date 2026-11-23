@@ -1427,12 +1427,16 @@ try {
 }
 
 const TG_CHANNEL = 'gdeseychastbiliantiki';
+// ⚠️ ВСТАВЬ СЮДА URL ТВОЕГО CLOUDFLARE WORKER (после деплоя worker.js)
+// Пример: 'https://antitb-news.твоё-имя.workers.dev'
+// Без этого НИЧЕГО РАБОТАТЬ НЕ БУДЕТ — Telegram блокирует запросы из браузера!
 const WORKER_URL = 'https://antitb-news.alik3ckx.workers.dev';
 const NEWS_LIMIT = 40;
 const FETCH_TTL = 45000;
 const ACTIVE_MS = 2 * 60 * 60 * 1000;   // 2 часа — метка «активна» (красная)
 const FADE_MS = 4 * 60 * 60 * 1000;    // 4 часа — метка «старая» (жёлтая)
 
+// === РАСПИСАНИЕ ПОЕЗДОВ (сгенерировано из CSV) ===
 const TRAIN_SCHEDULES = [
   {
     number: "6214", line: "МЦД-1", model: "ivo", model_name: "ЭГЭ2Тв Иволга 3.0",
@@ -1545,7 +1549,7 @@ const TRAIN_LABELS = {
   ed4m: 'ЭД4М',
 };
 
-
+// Цвета линий для подписи
 const TRAIN_LINE_COLORS = {
   'МЦД-1': '#f6a600', 'МЦД-2': '#e74280', 'МЦД-3': '#e95b0c', 'МЦД-4': '#40b280',
   'Ярославское': '#1e88e5', 'Павелецкое': '#7cb342', 'Киевское': '#1a237e',
@@ -1700,12 +1704,13 @@ map.on('resize', () => map.setMinZoom(2.5));
 
 map.attributionControl.setPrefix(false);
 
-new CachedTiles({
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
   minZoom: 2,
   maxZoom: 16,
   keepBuffer: 3,
   updateWhenZooming: false,
   updateInterval: 100,
+  crossOrigin: true,
   attribution: 'Tiles &copy; Esri'
 }).addTo(map);
 
