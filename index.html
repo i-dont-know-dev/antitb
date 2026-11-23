@@ -366,10 +366,11 @@ button,input{font:inherit;color:inherit}
 .sight-count{position:absolute;top:-2px;right:-2px;z-index:2;min-width:18px;height:18px;border-radius:9px;background:var(--primary);color:var(--on-primary);font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px;border:2px solid var(--surface)}
 /* SVG иконки поездов (вид сбоку) */
 .train-icon{background:transparent;border:0}
-.train-marker{display:flex;flex-direction:column;align-items:center;gap:1px}
-.train-svg{display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
-.train-label{background:var(--surface);color:var(--on-surface);font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;border:1px solid var(--outline);white-space:nowrap}
-.train-direction{font-size:9px;color:var(--on-surface-variant);font-weight:500}
+.train-pin{position:relative;width:44px;height:56px}
+.train-pin-body{position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:2;width:40px;height:40px;border-radius:50%;background:var(--surface);border:2.5px solid var(--c);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.train-pin-body svg{width:26px;height:26px}
+.train-pin::after{content:"";position:absolute;left:50%;top:34px;width:12px;height:12px;background:var(--surface);border-right:2.5px solid var(--c);border-bottom:2.5px solid var(--c);border-radius:0 0 3px 0;transform:translateX(-50%) rotate(45deg);z-index:1}
+.train-pin-label{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);background:var(--surface);color:var(--on-surface);font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;border:1px solid var(--outline);white-space:nowrap}
 .news-link{display:inline-block;margin-top:10px;font-size:12px;font-weight:600;color:var(--primary);text-decoration:none}
 .m3-card p{margin:0;font-size:13px;line-height:1.5;color:var(--on-surface-variant)}
 .color-row{
@@ -693,7 +694,7 @@ input{user-select:text}
       <div class="setting-row" id="toggleSightRow">
         <div>
           <strong>Метки ТБ и антиков</strong>
-          <small>Цвет: красная — до 2ч, жёлтая — 2-4ч, серая — 4-8ч (потом исчезает)</small>
+          <small>Цвет: красная — до 2ч, жёлтая — 2-2.5ч, потом исчезает</small>
         </div>
         <span class="switch on" id="switchSight"></span>
       </div>
@@ -1434,7 +1435,7 @@ const WORKER_URL = 'https://antitb-news.alik3ckx.workers.dev';
 const NEWS_LIMIT = 40;
 const FETCH_TTL = 45000;
 const ACTIVE_MS = 2 * 60 * 60 * 1000;   // 2 часа — метка «активна» (красная)
-const FADE_MS = 4 * 60 * 60 * 1000;    // 4 часа — метка «старая» (жёлтая)
+const FADE_MS = 2 * 60 * 60 * 1000 + 30 * 60 * 1000;    // 2.5 часа — метка «старая» (жёлтая)
 
 // === РАСПИСАНИЕ ПОЕЗДОВ (сгенерировано из CSV) ===
 const TRAIN_SCHEDULES = [
@@ -1560,9 +1561,9 @@ const TRAIN_LINE_COLORS = {
 
 const TRAIN_MIN_ZOOM = 11;  // поезда появляются при зуме 11+
 const TRAIN_UPDATE_MS = 5000;  // обновление позиций каждые 5 сек
-const MAX_AGE_MS = 8 * 60 * 60 * 1000;  // 8 часов — метка исчезает
-const OLD_GRACE = 30 * 60 * 1000;
-const DELETE_GRACE = 10 * 60 * 1000;
+const MAX_AGE_MS = 2 * 60 * 60 * 1000 + 30 * 60 * 1000;  // 2.5 часа — метка исчезает
+const OLD_GRACE = 5 * 60 * 1000;
+const DELETE_GRACE = 5 * 60 * 1000;
 const MCD_CENTER = [55.755, 37.62];
 const MCD_INIT_ZOOM = 10;
 const crs = L.CRS.EPSG3857;
@@ -1762,7 +1763,29 @@ const lineRank = l => l.trunk ? 2 : l.rail ? 1 : 0;
 const linePolylines = {};
 const orderedLines = Object.entries(LINES).sort(([, a], [, b]) => lineRank(b) - lineRank(a));
 const polyOpts = {pane: 'linesPane', renderer: renderers.lines, lineJoin: 'round', lineCap: 'round', interactive: false};
-const lineCoords = line => line.stations.map(s => [s.lat, s.lng]);
+// Интерполяция промежуточных точек между станциями для плавных линий
+// Добавляет точки по дуге между каждыми двумя станциями, чтобы линия шла по путям, а не через дома
+const interpolatePath = (stations) => {
+  const result = [];
+  for (let i = 0; i < stations.length; i++) {
+    result.push([stations[i].lat, stations[i].lng]);
+    if (i < stations.length - 1) {
+      const a = stations[i], b = stations[i + 1];
+      const dLat = b.lat - a.lat, dLng = b.lng - a.lng;
+      const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+      // Количество промежуточных точек зависит от расстояния
+      const steps = Math.max(2, Math.min(8, Math.round(dist * 50)));
+      for (let s = 1; s < steps; s++) {
+        const t = s / steps;
+        // Линейная интерполяция + лёгкое сглаживание (Catmull-Rom упрощённый)
+        result.push([a.lat + dLat * t, a.lng + dLng * t]);
+      }
+    }
+  }
+  return result;
+};
+
+const lineCoords = line => interpolatePath(line.stations);
 orderedLines.forEach(([code, line]) => {
   linePolylines[code] = {casing: L.polyline(lineCoords(line), {...polyOpts, color: '#050a18'}).addTo(map)};
 });
@@ -2206,11 +2229,25 @@ function findTrainPath(stops) {
       const min = Math.min(...indices);
       const max = Math.max(...indices);
       const pathStations = line.stations.slice(Math.min(min, max), Math.max(min, max) + 1);
+      // Используем интерполированные координаты для плавного движения поезда
+      const interpCoords = interpolatePath(pathStations);
+      // Пересчитываем индексы станций в интерполированном массиве
+      const stationIndices = [];
+      let idx = 0;
+      for (let i = 0; i < pathStations.length; i++) {
+        stationIndices.push(idx);
+        if (i < pathStations.length - 1) {
+          const a = pathStations[i], b = pathStations[i + 1];
+          const dist = Math.sqrt((b.lat - a.lat) ** 2 + (b.lng - a.lng) ** 2);
+          const steps = Math.max(2, Math.min(8, Math.round(dist * 50)));
+          idx += steps;
+        }
+      }
       return {
-        coords: pathStations.map(s => [s.lat, s.lng]),
+        coords: interpCoords,
         lineCode: code,
         lineName: line.name,
-        stationIndices: indices.map(i => i - Math.min(min, max))
+        stationIndices: indices.map(i => stationIndices[i - Math.min(min, max)])
       };
     }
   }
@@ -2357,17 +2394,13 @@ function renderTrains() {
     const pos = computeTrainPosition(schedule, now);
     if (!pos) continue;
     
-    // Направление движения (для поворота иконки)
     let rot = 0;
     if (pos.path.coords.length >= 2) {
       const idx = Math.floor(pos.progress * (pos.path.coords.length - 1));
       const next = Math.min(idx + 1, pos.path.coords.length - 1);
       const [lat1, lng1] = pos.path.coords[idx];
       const [lat2, lng2] = pos.path.coords[next];
-      const dLng = lng2 - lng1;
-      const dLat = lat2 - lat1;
-      if (Math.abs(dLng) > 0.0001 || Math.abs(dLat) > 0.0001) {
-        // Находим угол в пикселях экрана
+      if (Math.abs(lng2 - lng1) > 0.0001 || Math.abs(lat2 - lat1) > 0.0001) {
         const p1 = map.latLngToLayerPoint([lat1, lng1]);
         const p2 = map.latLngToLayerPoint([lat2, lng2]);
         rot = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
@@ -2375,23 +2408,17 @@ function renderTrains() {
     }
     
     const lineColor = TRAIN_LINE_COLORS[schedule.line] || '#818cf8';
-    const statusDot = pos.status === 'moving' ? '🟦' : pos.status === 'dwell' ? '🟩' : '⬜';
-    const direction = pos.status === 'moving' ? `→ ${pos.toStation || ''}` : 
-                      pos.status === 'dwell' ? `⏸ ${pos.atStation}` :
-                      pos.status === 'waiting' ? `⏳ ${pos.atStation}` :
-                      `🏁 ${pos.atStation}`;
     
     const icon = L.divIcon({
       className: 'train-icon',
-      html: `<div class="train-marker">
-        ${TRAIN_SVG[schedule.model](rot)}
-        <div class="train-label" style="border-color:${lineColor}">№${schedule.number} · ${TRAIN_LABELS[schedule.model]}</div>
-        <div class="train-direction">${direction}</div>
+      html: `<div class="train-pin" style="--c:${lineColor}">
+        <span class="train-pin-body">${TRAIN_SVG[schedule.model](rot)}</span>
+        <span class="train-pin-label">№${schedule.number}</span>
       </div>`,
-      iconSize: [80, 40],
-      iconAnchor: [40, 20]
+      iconSize: [44, 56],
+      iconAnchor: [22, 52]
     });
-    L.marker([pos.lat, pos.lng], {icon, keyboard: false, zIndexOffset: 800})
+    L.marker([pos.lat, pos.lng], {icon, keyboard: false, zIndexOffset: 900})
       .on('click', () => openTrainSheet(schedule, pos))
       .addTo(trainLayer);
   }
@@ -2412,7 +2439,7 @@ function makeBadge(label, color) {
   return b;
 }
 
-// Цвет метки: < 2ч — красная (активная), 2-4ч — жёлтая (старая), 4-8ч — серая (неактивная)
+// Цвет метки: < 2ч — красная (активная), 2-2.5ч — жёлтая (старая), потом исчезает
 const sightColor = sg => {
   if (sg.deleted) return INACTIVE_COLOR;
   if (sg.age >= FADE_MS) return INACTIVE_COLOR;  // серая
@@ -2443,7 +2470,7 @@ function openSightingSheet(sg) {
     lines.push(`Сообщение удалено из канала. Метка пропадёт через ${left} мин.`);
   } else if (sg.age >= FADE_MS) {
     const left = Math.max(1, Math.ceil((sg.removeAt - Date.now()) / 60000));
-    lines.push(`Неактивна: прошло больше 4 часов. Метка пропадёт через ${left} мин.`);
+    lines.push(`Неактивна: прошло больше 2 часов. Метка пропадёт через ${left} мин.`);
   } else if (sg.age >= ACTIVE_MS) {
     lines.push(`Старая метка: прошло больше 2 часов.`);
   }
@@ -2475,7 +2502,7 @@ function updateSightStatus() {
   if (channelPosts.length && !sightCount) {
     const ageMs = last ? Date.now() - last.getTime() : 0;
     if (ageMs > MAX_AGE_MS) {
-      warn = ' Все посты старше 8 часов — метки не отображаются.';
+      warn = ' Все посты старше 2.5 часов — метки не отображаются.';
     } else if (ageMs > ACTIVE_MS) {
       warn = ' Свежих постов (< 2ч) нет — все метки старые/неактивные.';
     } else {
