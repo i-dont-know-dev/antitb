@@ -359,10 +359,17 @@ button,input{font:inherit;color:inherit}
 .news-text{font-size:14px;line-height:1.5;color:var(--on-surface);white-space:pre-wrap;word-break:break-word}
 .news-img{display:block;width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin-bottom:10px}
 .sight-icon{background:transparent;border:0}
-.sight{position:relative;width:36px;height:44px}
-.sight::after{content:"";position:absolute;left:50%;top:26px;width:12px;height:12px;background:var(--surface);border-right:2px solid var(--c);border-bottom:2px solid var(--c);border-radius:0 0 3px 0;transform:translateX(-50%) rotate(45deg)}
-.sight-body{position:absolute;top:0;left:0;z-index:1;width:36px;height:36px;border-radius:50%;background:var(--surface);border:2px solid var(--c);display:grid;place-items:center}
-.sight-body svg{width:22px;height:22px}
+.sight{position:relative;width:40px;height:50px}
+.sight::after{content:"";position:absolute;left:50%;top:34px;width:12px;height:12px;background:var(--surface);border-right:2.5px solid var(--c);border-bottom:2.5px solid var(--c);border-radius:0 0 3px 0;transform:translateX(-50%) rotate(45deg)}
+.sight-body{position:absolute;top:0;left:0;z-index:1;width:40px;height:40px;border-radius:50%;background:var(--surface);border:2.5px solid var(--c);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.sight-body svg{width:24px;height:24px}
+.sight-count{position:absolute;top:-2px;right:-2px;z-index:2;min-width:18px;height:18px;border-radius:9px;background:var(--primary);color:var(--on-primary);font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px;border:2px solid var(--surface)}
+ 
+.train-icon{background:transparent;border:0}
+.train-marker{display:flex;flex-direction:column;align-items:center;gap:1px}
+.train-svg{display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.train-label{background:var(--surface);color:var(--on-surface);font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;border:1px solid var(--outline);white-space:nowrap}
+.train-direction{font-size:9px;color:var(--on-surface-variant);font-weight:500}
 .news-link{display:inline-block;margin-top:10px;font-size:12px;font-weight:600;color:var(--primary);text-decoration:none}
 .m3-card p{margin:0;font-size:13px;line-height:1.5;color:var(--on-surface-variant)}
 .color-row{
@@ -690,6 +697,13 @@ input{user-select:text}
         </div>
         <span class="switch on" id="switchSight"></span>
       </div>
+      <div class="setting-row" id="toggleTrainsRow">
+        <div>
+          <strong>Поезда на карте</strong>
+          <small>Движение по расписанию при зуме 12+. ЭП2Д, Иволга, ЭД4М, Фирменный экспресс</small>
+        </div>
+        <span class="switch on" id="switchTrains"></span>
+      </div>
       <div class="setting-row" id="toggleLegendRow">
         <div>
           <strong>Плашка «Линии МЦД» на карте</strong>
@@ -914,12 +928,14 @@ const RAIL_SRC = {
 Скоротово,55.7190,36.9570
 Звенигород,55.7297,36.8556`},
   Rgor: {name: 'Горьковское', color: '#f9a825', s: `Железнодорожная,55.7505,38.0112
-Обухово,55.7790,38.0700
-Купавна,55.8030,38.1600
-Старая Купавна,55.8010,38.1870
-Ногинск,55.8663,38.4372
+Стройка,55.7620,38.0450
+Купавна,55.7420,37.9930
+Старая Купавна,55.7400,38.0200
+Монино,55.7700,38.0900
+Фрязево,55.7800,38.2100
+Электрогорск,55.7800,38.4000
 Павловский Посад,55.7800,38.6500
-Назарьево,55.7600,38.7300
+Электросталь,55.7600,38.7300
 Вохна,55.7500,38.8100
 Дрезна,55.7410,38.8490
 Орехово-Зуево,55.8130,38.9630
@@ -989,25 +1005,39 @@ const RAIL_SRC = {
 Волоколамск,56.0328,35.9514
 Шаховская,56.0292,35.5158`},
   Rpav: {name: 'Павелецкое', color: '#7cb342', s: `Москва-Павелецкая,55.7297,37.6397
-Бирюлёво-Тов.,55.6050,37.6690
-Бирюлёво-Пасс.,55.5960,37.6680
-Булатниково,55.5450,37.7050
-Расторгуево,55.5250,37.7230
-Калинина,55.5100,37.7200
-Ленинская,55.4930,37.7330
-Домодедово,55.4350,37.7650
-Космос,55.4150,37.7740
-Авиационная,55.4070,37.7860
-Малино,55.4000,37.8000
-Барыбино,55.3922,37.8228
-Белые Столбы,55.3330,37.8800
-Вельяминово,55.3200,37.9200
-Привалово,55.1500,37.9800
-Шугарово,55.0300,38.0300
-Усады-Окружная,55.0100,38.0400
-Михнево,54.9981,38.0525
-Кашира,54.8483,38.1561
-Ожерелье,54.7886,38.2808`},
+Тульская,55.7009,37.6595
+Верхние Котлы,55.6897,37.6672
+Нагатинская,55.6817,37.6727
+Варшавская,55.6553,37.6908
+Чертаново,55.6345,37.7052
+Бирюлёво-Товарная,55.5969,37.7310
+Бирюлёво-Пассажирская,55.5881,37.7371
+Булатниково,55.5713,37.7486
+Расторгуево,55.5537,37.7607
+Калинина,55.5225,37.7822
+Ленинская,55.4905,37.8041
+32 км,55.4737,37.8157
+Домодедово,55.4457,37.8349
+Авиационная,55.4337,37.8432
+Космос,55.4257,37.8487
+Взлётная,55.4025,37.8647
+Востряково,55.3929,37.8713
+Белые Столбы,55.3433,37.9054
+Данилово,55.3209,37.9208
+Барыбино,55.2817,37.9477
+Вельяминово,55.2225,37.9885
+Привалово,55.1897,38.0110
+Михнево,55.1457,38.0412
+Шугарово,55.0921,38.0781
+Жилёво,55.0265,38.1232
+Ступино,54.9441,38.1798
+Акри,54.9081,38.2045
+Белопесоцкий,54.8929,38.2150
+Кашира-Пассажирская,54.8649,38.2343
+Тесна,54.8249,38.2618
+Ожерелье,54.7921,38.2843`},
+  Rpair: {name: 'Аэропорт Домодедово', color: '#558b2f', s: `Домодедово,55.4457,37.8349
+Аэропорт Домодедово,55.4147,37.9020`},
   Rsav: {name: 'Савёловское', color: '#607d8b', s: `Лобня,56.0124,37.4848
 Икша,56.0372,37.4903
 Некрасовская,56.0640,37.4590
@@ -1397,12 +1427,131 @@ try {
 }
 
 const TG_CHANNEL = 'gdeseychastbiliantiki';
-const WORKER_URL = 'https://antitb-news.alik3ckx.workers.dev//';
+
+const WORKER_URL = 'https://antitb-news.alik3ckx.workers.dev';
 const NEWS_LIMIT = 40;
 const FETCH_TTL = 45000;
-const ACTIVE_MS = 2 * 60 * 60 * 1000;   // 2 часа — метка «активна» (красная)
-const FADE_MS = 4 * 60 * 60 * 1000;    // 4 часа — метка «старая» (жёлтая)
-const MAX_AGE_MS = 8 * 60 * 60 * 1000;  // 8 часов — метка исчезает
+const ACTIVE_MS = 2 * 60 * 60 * 1000;   
+const FADE_MS = 4 * 60 * 60 * 1000;    
+
+const TRAIN_SCHEDULES = [
+  {
+    number: "6214", line: "МЦД-1", model: "ivo", model_name: "ЭГЭ2Тв Иволга 3.0",
+    days: "Ежедневно", origin: "Одинцово", destination: "Лобня",
+    stops: [
+      {station: "Одинцово", arrival: "08:00", dwell: 0, departure: "08:00"},
+      {station: "Сколково", arrival: "08:06", dwell: 1, departure: "08:07"},
+      {station: "Славянский бульвар", arrival: "08:16", dwell: 1, departure: "08:17"},
+      {station: "Белорусская", arrival: "08:27", dwell: 2, departure: "08:29"},
+      {station: "Савёловская", arrival: "08:34", dwell: 1, departure: "08:35"},
+      {station: "Окружная", arrival: "08:43", dwell: 1, departure: "08:44"},
+      {station: "Лианозово", arrival: "08:50", dwell: 1, departure: "08:51"},
+      {station: "Лобня", arrival: "09:05", dwell: 0, departure: "09:05"},
+    ]
+  },
+  {
+    number: "6318/6317", line: "МЦД-2", model: "ep2d", model_name: "ЭП2Д",
+    days: "Ежедневно", origin: "Нахабино", destination: "Подольск",
+    stops: [
+      {station: "Нахабино", arrival: "08:12", dwell: 0, departure: "08:12"},
+      {station: "Тушинская", arrival: "08:34", dwell: 1, departure: "08:35"},
+      {station: "Дмитровская", arrival: "08:47", dwell: 1, departure: "08:48"},
+      {station: "Площадь трёх вокзалов", arrival: "08:56", dwell: 2, departure: "08:58"},
+      {station: "Курская", arrival: "09:02", dwell: 2, departure: "09:04"},
+      {station: "Царицыно", arrival: "09:24", dwell: 1, departure: "09:25"},
+      {station: "Подольск", arrival: "09:49", dwell: 0, departure: "09:49"},
+    ]
+  },
+  {
+    number: "7321", line: "МЦД-3", model: "ivo", model_name: "ЭГЭ2Тв Иволга 4.0",
+    days: "Ежедневно", origin: "Зеленоград-Крюково", destination: "Ипподром",
+    stops: [
+      {station: "Зеленоград-Крюково", arrival: "09:00", dwell: 0, departure: "09:00"},
+      {station: "Химки", arrival: "09:18", dwell: 1, departure: "09:19"},
+      {station: "Лихоборы", arrival: "09:31", dwell: 1, departure: "09:32"},
+      {station: "Перово", arrival: "09:44", dwell: 1, departure: "09:45"},
+      {station: "Выхино", arrival: "10:03", dwell: 1, departure: "10:04"},
+      {station: "Люберцы", arrival: "10:10", dwell: 1, departure: "10:11"},
+      {station: "Ипподром", arrival: "10:34", dwell: 0, departure: "10:34"},
+    ]
+  },
+  {
+    number: "6610", line: "МЦД-4", model: "ep2d", model_name: "ЭП2ДМ",
+    days: "Ежедневно", origin: "Апрелевка", destination: "Железнодорожная",
+    stops: [
+      {station: "Апрелевка", arrival: "07:45", dwell: 0, departure: "07:45"},
+      {station: "Солнечная", arrival: "08:06", dwell: 1, departure: "08:07"},
+      {station: "Минская", arrival: "08:17", dwell: 1, departure: "08:18"},
+      {station: "Белорусская", arrival: "08:33", dwell: 2, departure: "08:35"},
+      {station: "Курская", arrival: "08:49", dwell: 2, departure: "08:51"},
+      {station: "Нижегородская", arrival: "08:57", dwell: 1, departure: "08:58"},
+      {station: "Железнодорожная", arrival: "09:20", dwell: 0, departure: "09:20"},
+    ]
+  },
+  {
+    number: "7042", line: "Ярославское", model: "expr", model_name: "ЭД4М-04xx (РЭКС)",
+    days: "Будни", origin: "Москва", destination: "Сергиев Посад",
+    stops: [
+      {station: "Площадь трёх вокзалов", arrival: "10:15", dwell: 0, departure: "10:15"},
+      {station: "Останкино", arrival: "10:24", dwell: 1, departure: "10:25"},
+      {station: "Мытищи", arrival: "10:34", dwell: 1, departure: "10:35"},
+      {station: "Пушкино", arrival: "10:46", dwell: 1, departure: "10:47"},
+      {station: "Сергиев Посад", arrival: "11:18", dwell: 0, departure: "11:18"},
+    ]
+  },
+  {
+    number: "6057", line: "Павелецкое", model: "ed4m", model_name: "ЭД4М",
+    days: "Ежедневно", origin: "Москва", destination: "Ожерелье",
+    stops: [
+      {station: "Москва-Павелецкая", arrival: "11:05", dwell: 0, departure: "11:05"},
+      {station: "Варшавская", arrival: "11:13", dwell: 1, departure: "11:14"},
+      {station: "Домодедово", arrival: "11:46", dwell: 2, departure: "11:48"},
+      {station: "Барыбино", arrival: "12:12", dwell: 8, departure: "12:20"},
+      {station: "Михнево", arrival: "12:36", dwell: 1, departure: "12:37"},
+      {station: "Ступино", arrival: "12:58", dwell: 1, departure: "12:59"},
+      {station: "Ожерелье", arrival: "13:15", dwell: 0, departure: "13:15"},
+    ]
+  },
+  {
+    number: "6105", line: "Киевское", model: "ep2d", model_name: "ЭП2Д",
+    days: "Выходные", origin: "Москва", destination: "Калуга-1",
+    stops: [
+      {station: "Апрелевка", arrival: "09:20", dwell: 0, departure: "09:20"},
+      {station: "Апрелевка", arrival: "10:02", dwell: 2, departure: "10:04"},
+      {station: "Нара", arrival: "10:28", dwell: 1, departure: "10:29"},
+      {station: "Балабаново", arrival: "10:51", dwell: 1, departure: "10:52"},
+      {station: "Обнинская", arrival: "11:04", dwell: 2, departure: "11:06"},
+      {station: "Малоярославец", arrival: "11:22", dwell: 12, departure: "11:34"},
+      {station: "Калуга-1", arrival: "12:18", dwell: 0, departure: "12:18"},
+    ]
+  },
+];
+
+const TRAIN_SVG = {
+  ep2d: (rot = 0) => `<svg class="train-svg" width="48" height="20" viewBox="0 0 48 20" style="transform:rotate(${rot}deg)"><defs><linearGradient id="ep2d-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0f3f6"/><stop offset="1" stop-color="#d8dde2"/></linearGradient></defs><rect x="2" y="4" width="40" height="11" rx="2" fill="url(#ep2d-body)" stroke="#9aa0a6" stroke-width="0.5"/><path d="M42 4 L46 9.5 L42 15 Z" fill="#f08a1c"/><rect x="42" y="7" width="3" height="5" fill="#e8452a"/><rect x="2" y="13.5" width="40" height="1.5" fill="#4a4d52"/><rect x="3" y="9" width="40" height="0.8" fill="#f08a1c"/><rect x="3" y="9.8" width="40" height="0.3" fill="#f6c431"/><rect x="3" y="10.5" width="40" height="0.3" fill="#d92f2a"/><circle cx="8" cy="16" r="2.2" fill="#2a2e34"/><circle cx="8" cy="16" r="1" fill="#5a6068"/><circle cx="36" cy="16" r="2.2" fill="#2a2e34"/><circle cx="36" cy="16" r="1" fill="#5a6068"/><rect x="6" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="12" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="18" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="24" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="30" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="36" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/></svg>`,
+  ivo: (rot = 0) => `<svg class="train-svg" width="48" height="20" viewBox="0 0 48 20" style="transform:rotate(${rot}deg)"><defs><linearGradient id="ivo-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f9fb"/><stop offset="1" stop-color="#e0e5ea"/></linearGradient></defs><path d="M2 4 L42 4 L46 10 L42 15 L2 15 Z" fill="url(#ivo-body)" stroke="#b0b8c0" stroke-width="0.5"/><path d="M2 4 L42 4 L46 10 L42 15 L2 15 Z" fill="none" stroke="#d6212b" stroke-width="2.5"/><rect x="2" y="12" width="44" height="3" fill="#1c4f9c"/><rect x="2" y="11.8" width="44" height="0.4" fill="#ffffff"/><circle cx="8" cy="16" r="2.2" fill="#2a2e34"/><circle cx="8" cy="16" r="1" fill="#5a6068"/><circle cx="36" cy="16" r="2.2" fill="#2a2e34"/><circle cx="36" cy="16" r="1" fill="#5a6068"/><rect x="6" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/><rect x="13" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/><rect x="20" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/><rect x="27" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/><rect x="34" y="6" width="4" height="3.5" fill="#1b2a38" rx="0.5"/></svg>`,
+  expr: (rot = 0) => `<svg class="train-svg" width="48" height="20" viewBox="0 0 48 20" style="transform:rotate(${rot}deg)"><defs><linearGradient id="expr-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8ced4"/><stop offset="1" stop-color="#a8aeb6"/></linearGradient></defs><rect x="2" y="4" width="40" height="11" rx="2" fill="url(#expr-body)" stroke="#7a8088" stroke-width="0.5"/><path d="M42 4 L46 9.5 L42 15 Z" fill="#e2432a"/><rect x="2" y="13.5" width="40" height="1.5" fill="#454a50"/><rect x="3" y="9" width="40" height="1" fill="#f39a1e"/><rect x="3" y="10" width="40" height="0.4" fill="#f6d02f"/><rect x="20" y="10.5" width="12" height="2.5" fill="#1d4f9c" rx="0.3"/><circle cx="8" cy="16" r="2.2" fill="#2a2e34"/><circle cx="8" cy="16" r="1" fill="#5a6068"/><circle cx="36" cy="16" r="2.2" fill="#2a2e34"/><circle cx="36" cy="16" r="1" fill="#5a6068"/><rect x="6" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="12" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="18" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="24" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="30" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="36" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/></svg>`,
+  ed4m: (rot = 0) => `<svg class="train-svg" width="48" height="20" viewBox="0 0 48 20" style="transform:rotate(${rot}deg)"><defs><linearGradient id="ed4m-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2f4f6"/><stop offset="1" stop-color="#d4d8dc"/></linearGradient></defs><rect x="2" y="4" width="40" height="11" rx="1.5" fill="url(#ed4m-body)" stroke="#8c8f93" stroke-width="0.5"/><path d="M42 4 L46 9.5 L42 15 Z" fill="#e04a22"/><rect x="2" y="13.5" width="40" height="1.5" fill="#8c8f93"/><rect x="5" y="4.5" width="4" height="10.5" fill="#e04a22"/><rect x="33" y="4.5" width="4" height="10.5" fill="#e04a22"/><circle cx="8" cy="16" r="2.2" fill="#2a2e34"/><circle cx="8" cy="16" r="1" fill="#5a6068"/><circle cx="36" cy="16" r="2.2" fill="#2a2e34"/><circle cx="36" cy="16" r="1" fill="#5a6068"/><rect x="11" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="17" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="23" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/><rect x="29" y="6" width="3" height="3" fill="#1b2a38" rx="0.5"/></svg>`,
+};
+
+const TRAIN_LABELS = {
+  ep2d: 'ЭП2Д',
+  ivo: 'Иволга',
+  expr: 'Фирменный экспресс',
+  ed4m: 'ЭД4М',
+};
+
+const TRAIN_LINE_COLORS = {
+  'МЦД-1': '#f6a600', 'МЦД-2': '#e74280', 'МЦД-3': '#e95b0c', 'МЦД-4': '#40b280',
+  'Ярославское': '#1e88e5', 'Павелецкое': '#7cb342', 'Киевское': '#1a237e',
+  'Горьковское': '#f9a825', 'Казанское': '#43a047', 'Савёловское': '#607d8b',
+  'Рижское': '#26a69a', 'Белорусское': '#e53935', 'Ленинградское': '#8e24aa',
+  'Аэропорт Домодедово': '#558b2f',
+};
+
+const TRAIN_MIN_ZOOM = 11;  
+const TRAIN_UPDATE_MS = 5000;  
+const MAX_AGE_MS = 8 * 60 * 60 * 1000;  
 const OLD_GRACE = 30 * 60 * 1000;
 const DELETE_GRACE = 10 * 60 * 1000;
 const MCD_CENTER = [55.755, 37.62];
@@ -1629,6 +1778,7 @@ const state = {
   labels: true,
   legend: true,
   sightings: true,
+  trains: true,
   filter: 'all',
   selected: null,
   focus: null
@@ -1714,8 +1864,8 @@ function refreshLines() {
   updateStations();
 }
 
-map.on('zoomend', refreshLines);
-map.on('moveend', updateStations);
+map.on('zoomend', () => { refreshLines(); renderTrains(); });
+map.on('moveend', () => { updateStations(); renderTrains(); });
 map.on('click', closeStationSheet);
 
 $('closeSheetBtn').addEventListener('click', closeStationSheet);
@@ -1797,16 +1947,13 @@ chips.forEach(chip => chip.addEventListener('click', () => {
 }));
 
 const PROXIES = [
-  // 1. Свой Cloudflare Worker (если задан WORKER_URL) — самый надёжный
+  
+  
+  
+  
   ...(WORKER_URL ? [{url: () => WORKER_URL, timeout: 15000}] : []),
-  // 2. Cloudflare Pages Function (если хостится на Pages)
-  {url: () => '/api/news', timeout: 15000},
-  // 3. Публичные CORS-прокси (часто не работают, но как fallback)
-  {url: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`, timeout: 30000},
-  {url: u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, json: true, timeout: 30000},
-  {url: u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`, timeout: 15000},
-  {url: u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, timeout: 15000},
-  {url: u => `https://thingproxy.freeboard.io/fetch/${u}`, timeout: 15000}
+  
+  {url: () => '/api/news', timeout: 15000}
 ];
 const newsList = $('newsList');
 let channelPosts = [];
@@ -1847,14 +1994,20 @@ const STATION_SYNONYMS = {
   'красного строителя': 'красный строитель',
   'красногорая': 'красногорская',
   'дегунено': 'дегунино',
-  'дегунино': 'дегунино',
   'павшено': 'павшино',
-  'остров мечтв': 'остров мечты',
-  'остров мечт': 'остров мечты',
   'москва-сити': 'москва-сити тестовская',
   'москва сити': 'москва-сити тестовская',
-  'серп и молот': 'серп и молот',
-  'серп и молот': 'серп и молот'
+  'коломенское': 'варшавская',
+  'бирюлево тов': 'бирюлёво-товарная',
+  'бирюлёво тов': 'бирюлёво-товарная',
+  'бирюлёво пасс': 'бирюлёво-пассажирская',
+  'бирюлёво пас': 'бирюлёво-пассажирская',
+  'белые столбы': 'белые столбы',
+  'кашира пассажирская': 'кашира-пассажирская',
+  'кашира': 'кашира-пассажирская',
+  'аэропорт домодедово': 'аэропорт домодедово',
+  '32 км': '32 км',
+  '32км': '32 км',
 };
 
 function norm(s) {
@@ -1922,7 +2075,7 @@ function routePath(a, b) {
 function parseSightings(post) {
   if (!post.date || isNaN(post.date)) return [];
   const fullText = post.text.replace(/\u00a0/g, ' ');
-  // Разбиваем на блоки по заголовку "Где сейчас" или по 👀 — на случай если в посте несколько меток
+  
   const blocks = fullText.split(/(?=Где\s+сейчас|👀)/i).filter(b => b.includes('👀') || /замечен/i.test(b));
   if (!blocks.length) {
     blocks.push(fullText);
@@ -1976,22 +2129,22 @@ function syncStore(list) {
       postStore.delete(id);
       return;
     }
-    // Удаляем только совсем старые посты (> MAX_AGE_MS = 8 часов)
+    
     if (now > date.getTime() + MAX_AGE_MS) {
       postStore.delete(id);
       return;
     }
-    // Если пост в списке — сбрасываем счётчик пропусков
+    
     if (ids.has(id)) {
       entry.missed = 0;
       entry.deletedAt = 0;
       return;
     }
-    // Если пост моложе MAX_AGE_MS и его нет в выдаче — скорее всего прокси вернул не все посты
+    
     if (now < date.getTime() + MAX_AGE_MS) return;
-    // Если id меньше minId — пост старый, Telegram его не отдаёт, не помечаем
+    
     if (id < minId) return;
-    // Если id больше maxId — это новый пост, которого мы не видели, игнорируем
+    
     if (id > maxId) return;
     entry.missed++;
     if (entry.missed >= 3 && !entry.deletedAt) entry.deletedAt = now;
@@ -1999,6 +2152,235 @@ function syncStore(list) {
 }
 
 const sightLayer = L.layerGroup().addTo(map);
+const trainLayer = L.layerGroup().addTo(map);
+
+function findTrainStation(name) {
+  const norm = n => n.toLowerCase().replace(/ё/g, 'е').replace(/[^а-яa-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+  const target = norm(name);
+  for (const st of ALL_STATIONS) {
+    for (const n of st.norms) {
+      if (n === target) return st;
+    }
+  }
+  
+  let best = null, bestScore = Infinity;
+  for (const st of ALL_STATIONS) {
+    for (const n of st.norms) {
+      if (Math.abs(n.length - target.length) > 3) continue;
+      const d = lev(target, n);
+      if (d > 2) continue;
+      const score = d * 10 - (st.lines.some(c => lineRank(LINES[c]) === 0) ? 1 : 0);
+      if (score < bestScore) { bestScore = score; best = st; }
+    }
+  }
+  return best;
+}
+
+function findTrainPath(stops) {
+  const points = [];
+  const lineCode = stops[0] && stops[0].station;
+  
+  for (const [code, line] of Object.entries(LINES)) {
+    const stations = line.stations.map(s => s.name);
+    let allFound = true;
+    const indices = [];
+    for (const stop of stops) {
+      const idx = stations.indexOf(stop.station);
+      if (idx < 0) { allFound = false; break; }
+      indices.push(idx);
+    }
+    if (allFound) {
+      const min = Math.min(...indices);
+      const max = Math.max(...indices);
+      const pathStations = line.stations.slice(Math.min(min, max), Math.max(min, max) + 1);
+      return {
+        coords: pathStations.map(s => [s.lat, s.lng]),
+        lineCode: code,
+        lineName: line.name,
+        stationIndices: indices.map(i => i - Math.min(min, max))
+      };
+    }
+  }
+  
+  const coords = [];
+  const stationIndices = [];
+  for (const stop of stops) {
+    const st = findTrainStation(stop.station);
+    if (st) {
+      coords.push([st.lat, st.lng]);
+      stationIndices.push(coords.length - 1);
+    }
+  }
+  return { coords, lineCode: null, lineName: null, stationIndices };
+}
+
+function parseTime(t) {
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2}):(\d{2})$/);
+  return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
+}
+
+function computeTrainPosition(schedule, now) {
+  const nowMin = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  const stops = schedule.stops;
+  const path = findTrainPath(stops);
+  if (!path.coords.length) {
+    console.warn('No path for train', schedule.number, 'stations:', stops.map(s => s.station).join(', '));
+    return null;
+  }
+
+  
+  const startMin = parseTime(stops[0].departure);
+  const endMin = parseTime(stops[stops.length - 1].arrival);
+  if (startMin === null || endMin === null) return null;
+
+  
+  if (nowMin < startMin) {
+    return {
+      lat: path.coords[0][0], lng: path.coords[0][1],
+      progress: 0, status: 'waiting', atStation: stops[0].station,
+      nextStation: stops[1]?.station, nextTime: stops[1]?.arrival,
+      path, departsIn: startMin - nowMin
+    };
+  }
+  
+  if (nowMin >= endMin) {
+    const lastIdx = path.coords.length - 1;
+    return {
+      lat: path.coords[lastIdx][0], lng: path.coords[lastIdx][1],
+      progress: 1, status: 'arrived', atStation: stops[stops.length - 1].station,
+      path
+    };
+  }
+
+  
+  let prevStopIdx = 0;
+  for (let i = 0; i < stops.length - 1; i++) {
+    const segStart = parseTime(stops[i].departure) || parseTime(stops[i].arrival);
+    const segEnd = parseTime(stops[i + 1].arrival);
+    if (segStart === null || segEnd === null) continue;
+    if (nowMin >= segStart && nowMin < segEnd) {
+      
+      const arrivalTime = parseTime(stops[i].arrival);
+      const departureTime = parseTime(stops[i].departure);
+      if (arrivalTime && departureTime && nowMin >= arrivalTime && nowMin < departureTime) {
+        const idx = path.stationIndices[i] || 0;
+        return {
+          lat: path.coords[idx][0], lng: path.coords[idx][1],
+          progress: i / (stops.length - 1), status: 'dwell', atStation: stops[i].station,
+          nextStation: stops[i + 1]?.station, nextTime: stops[i + 1]?.arrival,
+          path, departsIn: departureTime - nowMin
+        };
+      }
+      
+      const segProgress = (nowMin - segStart) / (segEnd - segStart);
+      const startIdx = path.stationIndices[i] || 0;
+      const endIdx = path.stationIndices[i + 1] || (path.coords.length - 1);
+      
+      const subProgress = startIdx + segProgress * (endIdx - startIdx);
+      const lo = Math.floor(subProgress);
+      const hi = Math.min(lo + 1, path.coords.length - 1);
+      const frac = subProgress - lo;
+      const lat = path.coords[lo][0] + (path.coords[hi][0] - path.coords[lo][0]) * frac;
+      const lng = path.coords[lo][1] + (path.coords[hi][1] - path.coords[lo][1]) * frac;
+      return {
+        lat, lng, progress: (i + segProgress) / (stops.length - 1), status: 'moving',
+        fromStation: stops[i].station, toStation: stops[i + 1].station,
+        nextTime: stops[i + 1].arrival, path
+      };
+    }
+  }
+  return null;
+}
+
+const trainMarkers = new Map();
+
+function openTrainSheet(schedule, pos) {
+  const hadSelection = Boolean(state.selected);
+  state.selected = null;
+  state.focus = { lat: pos.lat, lng: pos.lng };
+  $('sheetTitle').textContent = `№ ${schedule.number}`;
+  const lineColor = TRAIN_LINE_COLORS[schedule.line] || '#818cf8';
+  const badges = [makeBadge(TRAIN_LABELS[schedule.model], lineColor)];
+  badges.push(makeBadge(schedule.line, lineColor));
+  if (pos.status === 'moving') badges.push(makeBadge('В пути', '#3b82f6'));
+  else if (pos.status === 'dwell') badges.push(makeBadge('На станции', '#10b981'));
+  else if (pos.status === 'waiting') badges.push(makeBadge('Ожидание', '#6b7280'));
+  else if (pos.status === 'arrived') badges.push(makeBadge('Прибыл', '#6b7280'));
+  sheetBadges.replaceChildren(...badges);
+  const lines = [
+    `Состав: ${schedule.model_name}`,
+    `Маршрут: ${schedule.origin} → ${schedule.destination}`,
+    `Расписание: ${schedule.days}`,
+    '',
+    'Остановки:',
+    ...schedule.stops.map(s => {
+      const t = s.arrival || s.departure;
+      const dwell = s.dwell ? ` (${s.dwell} мин)` : '';
+      return `  ${t} · ${s.station}${dwell}`;
+    })
+  ];
+  $('sheetDesc').textContent = lines.join('\n');
+  let meta = '';
+  if (pos.status === 'moving') meta = `${pos.fromStation} → ${pos.toStation}, прибытие в ${pos.nextTime}`;
+  else if (pos.status === 'dwell') meta = `На станции ${pos.atStation}, отправление через ${Math.ceil(pos.departsIn)} мин`;
+  else if (pos.status === 'waiting') meta = `Отправление через ${Math.ceil(pos.departsIn)} мин`;
+  else if (pos.status === 'arrived') meta = `Конечная станция: ${pos.atStation}`;
+  $('sheetMeta').textContent = meta;
+  stationSheet.classList.add('open');
+  if (hadSelection) updateStations();
+}
+
+function renderTrains() {
+  trainLayer.clearLayers();
+  if (!state.trains) return;
+  const z = map.getZoom();
+  if (z < TRAIN_MIN_ZOOM) return;
+  const now = new Date();
+  
+  for (const schedule of TRAIN_SCHEDULES) {
+    const pos = computeTrainPosition(schedule, now);
+    if (!pos) continue;
+    
+    
+    let rot = 0;
+    if (pos.path.coords.length >= 2) {
+      const idx = Math.floor(pos.progress * (pos.path.coords.length - 1));
+      const next = Math.min(idx + 1, pos.path.coords.length - 1);
+      const [lat1, lng1] = pos.path.coords[idx];
+      const [lat2, lng2] = pos.path.coords[next];
+      const dLng = lng2 - lng1;
+      const dLat = lat2 - lat1;
+      if (Math.abs(dLng) > 0.0001 || Math.abs(dLat) > 0.0001) {
+        
+        const p1 = map.latLngToLayerPoint([lat1, lng1]);
+        const p2 = map.latLngToLayerPoint([lat2, lng2]);
+        rot = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+      }
+    }
+    
+    const lineColor = TRAIN_LINE_COLORS[schedule.line] || '#818cf8';
+    const statusDot = pos.status === 'moving' ? '🟦' : pos.status === 'dwell' ? '🟩' : '⬜';
+    const direction = pos.status === 'moving' ? `→ ${pos.toStation || ''}` : 
+                      pos.status === 'dwell' ? `⏸ ${pos.atStation}` :
+                      pos.status === 'waiting' ? `⏳ ${pos.atStation}` :
+                      `🏁 ${pos.atStation}`;
+    
+    const icon = L.divIcon({
+      className: 'train-icon',
+      html: `<div class="train-marker">
+        ${TRAIN_SVG[schedule.model](rot)}
+        <div class="train-label" style="border-color:${lineColor}">№${schedule.number} · ${TRAIN_LABELS[schedule.model]}</div>
+        <div class="train-direction">${direction}</div>
+      </div>`,
+      iconSize: [80, 40],
+      iconAnchor: [40, 20]
+    });
+    L.marker([pos.lat, pos.lng], {icon, keyboard: false, zIndexOffset: 800})
+      .on('click', () => openTrainSheet(schedule, pos))
+      .addTo(trainLayer);
+  }
+}
 
 function agoText(ms) {
   const mins = Math.round(ms / 60000);
@@ -2015,12 +2397,11 @@ function makeBadge(label, color) {
   return b;
 }
 
-// Цвет метки: < 2ч — красная (активная), 2-4ч — жёлтая (старая), 4-8ч — серая (неактивная)
 const sightColor = sg => {
   if (sg.deleted) return INACTIVE_COLOR;
-  if (sg.age >= FADE_MS) return INACTIVE_COLOR;  // серая
-  if (sg.age >= ACTIVE_MS) return `hsl(45 95% 55%)`;  // жёлтая
-  return `hsl(${Math.round(Math.min(sg.age / ACTIVE_MS, 1) * 50)} 88% 56%)`;  // от красной до оранжевой
+  if (sg.age >= FADE_MS) return INACTIVE_COLOR;  
+  if (sg.age >= ACTIVE_MS) return `hsl(45 95% 55%)`;  
+  return `hsl(${Math.round(Math.min(sg.age / ACTIVE_MS, 1) * 50)} 88% 56%)`;  
 };
 
 function openSightingSheet(sg) {
@@ -2066,7 +2447,9 @@ function updateSightStatus() {
     return;
   }
   if (!postsLoadedAt) {
-    el.textContent = postsFailed ? 'Канал не загрузился. Проверьте соединение или задеплойте Cloudflare Worker (worker.js).' : 'Загрузка канала…';
+    el.textContent = postsFailed
+      ? `Канал не загрузился. ${!WORKER_URL ? 'WORKER_URL не задан — задеплойте worker.js как Cloudflare Worker (см. README.md).' : `Проверьте Worker: ${WORKER_URL}`}`
+      : 'Загрузка канала…';
     return;
   }
   const last = channelPosts[0] && channelPosts[0].date;
@@ -2096,7 +2479,7 @@ function renderSightings() {
   const now = Date.now();
   const items = [];
   postStore.forEach(({post, deletedAt}) => parseSightings(post).forEach(sg => {
-    // Метка живёт MAX_AGE_MS (8 часов) или до удаления+DELETE_GRACE
+    
     const removeAt = Math.min(sg.date.getTime() + MAX_AGE_MS, deletedAt ? deletedAt + DELETE_GRACE : Infinity);
     if (now >= removeAt) return;
     const age = Math.max(0, now - sg.date.getTime());
@@ -2112,27 +2495,32 @@ function renderSightings() {
     seen.add(key);
     groups.set(stKey, [...(groups.get(stKey) || []), sg]);
   });
-  groups.forEach(group => group.forEach((sg, i) => {
-    const color = sightColor(sg);
-    const dx = (i - (group.length - 1) / 2) * 38;
-    const faded = sg.deleted || sg.age >= FADE_MS;
-    if (sg.route && i === 0) {
-      L.polyline(sg.route, {color, weight: 5, opacity: faded ? 0.4 : 0.9, dashArray: '1 9', lineCap: 'round', interactive: false}).addTo(sightLayer);
-    }
-    const icon = L.divIcon({
-      className: 'sight-icon',
-      html: `<div class="sight" style="--c:${color}"><span class="sight-body">${ICONS[sg.kind](color)}</span></div>`,
-      iconSize: [36, 44],
-      iconAnchor: [18 - dx, 41]
+  groups.forEach(group => {
+    
+    const showCount = group.length > 1;
+    group.forEach((sg, i) => {
+      const color = sightColor(sg);
+      const dx = (i - (group.length - 1) / 2) * 42;
+      const faded = sg.deleted || sg.age >= FADE_MS;
+      if (sg.route && i === 0) {
+        L.polyline(sg.route, {color, weight: 5, opacity: faded ? 0.4 : 0.9, dashArray: '1 9', lineCap: 'round', interactive: false}).addTo(sightLayer);
+      }
+      const countBadge = showCount ? `<div class="sight-count">${i + 1}</div>` : '';
+      const icon = L.divIcon({
+        className: 'sight-icon',
+        html: `<div class="sight" style="--c:${color}"><span class="sight-body">${ICONS[sg.kind](color)}</span>${countBadge}</div>`,
+        iconSize: [40, 50],
+        iconAnchor: [20 - dx, 46]
+      });
+      L.marker([sg.station.lat, sg.station.lng], {
+        icon,
+        keyboard: false,
+        zIndexOffset: faded ? 500 : 1000,
+        opacity: faded ? 0.7 : 1
+      }).on('click', () => openSightingSheet(sg)).addTo(sightLayer);
+      sightCount++;
     });
-    L.marker([sg.station.lat, sg.station.lng], {
-      icon,
-      keyboard: false,
-      zIndexOffset: faded ? 500 : 1000,
-      opacity: faded ? 0.7 : 1
-    }).on('click', () => openSightingSheet(sg)).addTo(sightLayer);
-    sightCount++;
-  }));
+  });
   updateSightStatus();
 }
 
@@ -2161,8 +2549,8 @@ async function fetchChannelHtml(channel) {
       });
       if (!res.ok) { lastErr = new Error(`HTTP ${res.status}`); continue; }
       const body = proxy.json ? (await res.json()).contents : await res.text();
-      // Строгая проверка: реальный ответ Telegram содержит data-post="канал/NNN"
-      // с реальным именем канала. В index.html этой строки НЕТ.
+      
+      
       const postMarker = `data-post="${channel}/`;
       if (!body || !body.includes(postMarker)) {
         lastErr = new Error('not a real telegram response');
@@ -2226,7 +2614,7 @@ function renderPosts(list) {
       t.textContent = post.text;
       card.append(t);
     }
-    if (/^https:\/\/t\.me\//.test(post.href)) {
+    if (/^https:\/\/t\.me\
       const a = document.createElement('a');
       a.className = 'news-link';
       a.href = post.href;
@@ -2242,7 +2630,12 @@ function renderPosts(list) {
 function renderNews() {
   if (!TG_CHANNEL) return newsMessage('Канал не задан', 'Укажите имя канала в константе TG_CHANNEL.');
   if (channelPosts.length) return renderPosts(channelPosts);
-  if (postsFailed) return newsMessage('Не удалось загрузить канал', 'Проверьте, что задеплоена Pages Function (functions/api/news.js) или задан WORKER_URL. Иначе Telegram блокирует запросы из браузера (CORS).');
+  if (postsFailed) {
+    const workerHint = !WORKER_URL
+      ? 'Telegram блокирует запросы из браузера (нет CORS заголовков). Все публичные прокси мертвы. Нужно задеплоить worker.js как Cloudflare Worker и вставить URL в WORKER_URL в index.html. Инструкция в README.md.'
+      : `Проверьте что Worker по URL ${WORKER_URL} отвечает (откройте его в браузере).`;
+    return newsMessage('Не удалось загрузить канал', workerHint);
+  }
   if (postsLoadedAt) return newsMessage('Пока пусто', 'В канале нет публичных постов.');
   newsMessage('Загрузка', 'Получаем последние новости…');
 }
@@ -2356,13 +2749,16 @@ function bindToggle(rowId, switchId, key, apply) {
 bindToggle('toggleMcdRow', 'switchMcd', 'mcd', refreshLines);
 bindToggle('toggleLabelsRow', 'switchLabels', 'labels', updateStations);
 bindToggle('toggleSightRow', 'switchSight', 'sightings', renderSightings);
+bindToggle('toggleTrainsRow', 'switchTrains', 'trains', renderTrains);
 bindToggle('toggleLegendRow', 'switchLegend', 'legend', () => $('legendBox').classList.toggle('hidden', !state.legend));
 
 positionThumb(dockEl.querySelector('.nav-btn.selected'));
 syncColors();
+renderTrains();
 renderNews();
 refreshPosts();
 setInterval(() => { refreshPosts(); renderSightings(); }, 60000);
+setInterval(() => { renderTrains(); }, TRAIN_UPDATE_MS);
 
 })();
 </script>
