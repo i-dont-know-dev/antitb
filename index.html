@@ -58,8 +58,8 @@ button,input{font:inherit;color:inherit}
   background:var(--bg)!important;
   font-family:var(--font)!important;
 }
-.leaflet-tile-pane{
-  filter:hue-rotate(200deg) saturate(0.6) brightness(0.85) contrast(1.1);
+.leaflet-tile{
+  filter:brightness(0.55) sepia(1) saturate(2.5) hue-rotate(195deg) contrast(1.1);
 }
 .leaflet-control-attribution{
   font-size:10px!important;
@@ -362,11 +362,13 @@ button,input{font:inherit;color:inherit}
 .news-text{font-size:14px;line-height:1.5;color:var(--on-surface);white-space:pre-wrap;word-break:break-word}
 .news-img{display:block;width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin-bottom:10px}
 .sight-icon{background:transparent;border:0}
-.sight{position:relative;width:40px;height:50px}
-.sight::after{content:"";position:absolute;left:50%;top:34px;width:12px;height:12px;background:var(--surface);border-right:2.5px solid var(--c);border-bottom:2.5px solid var(--c);border-radius:0 0 3px 0;transform:translateX(-50%) rotate(45deg)}
-.sight-body{position:absolute;top:0;left:0;z-index:1;width:40px;height:40px;border-radius:50%;background:var(--surface);border:2.5px solid var(--c);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.4)}
-.sight-body svg{width:24px;height:24px}
-.sight-count{position:absolute;top:-2px;right:-2px;z-index:2;min-width:18px;height:18px;border-radius:9px;background:var(--primary);color:var(--on-primary);font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 4px;border:2px solid var(--surface)}
+.sight{position:relative;width:auto;min-width:48px;display:flex;flex-direction:column;align-items:center}
+.sight-pin{position:relative;width:44px;height:44px}
+.sight-pin::after{content:"";position:absolute;left:50%;top:38px;width:12px;height:12px;background:var(--surface);border-right:2.5px solid var(--c);border-bottom:2.5px solid var(--c);border-radius:0 0 3px 0;transform:translateX(-50%) rotate(45deg);z-index:1}
+.sight-body{position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:2;width:44px;height:44px;border-radius:50%;background:var(--surface);border:3px solid var(--c);display:grid;place-items:center;box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.sight-body svg{width:26px;height:26px}
+.sight-label{background:var(--c);color:#0b1224;font-size:11px;font-weight:800;padding:2px 8px;border-radius:8px;white-space:nowrap;margin-top:4px;box-shadow:0 2px 6px rgba(0,0,0,.4);letter-spacing:.3px}
+.sight-count{position:absolute;top:-3px;right:-8px;z-index:3;min-width:20px;height:20px;border-radius:10px;background:var(--primary);color:var(--on-primary);font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 5px;border:2px solid var(--surface)}
 /* SVG иконки поездов (вид сбоку) */
 .train-icon{background:transparent;border:0}
 .train-pin{position:relative;width:44px;height:56px}
@@ -1626,9 +1628,9 @@ const crs = L.CRS.EPSG3857;
 const WORLD_M = 40075016.686;
 const RADIUS = 4500000;
 const CORE_RADIUS = 600000;
-const TINT = '#3b4d6b';
-const SHADE = '#98a4ba';
-const VEIL = 'rgba(8,12,20,0.3)';
+const TINT = '#1e3a6f';
+const SHADE = '#0a1530';
+const VEIL = 'rgba(6,12,28,0.4)';
 const STATION_MIN_ZOOM = 10.5;
 const TRUNK_STATION_ZOOM = 6;
 const LABEL_MIN_ZOOM = 12.5;
@@ -1664,6 +1666,7 @@ function loadTile(z, x, y) {
       try {
         return await new Promise((resolve, reject) => {
           const img = new Image();
+          img.crossOrigin = 'anonymous';
           img.onload = () => resolve(img);
           img.onerror = reject;
           img.src = TILE_URL(z, x, y);
@@ -1689,15 +1692,6 @@ const CachedTiles = L.GridLayer.extend({
     const paint = img => {
       ctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(img, 0, 0, 256, 256);
-      ctx.globalCompositeOperation = 'color';
-      ctx.fillStyle = TINT;
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = SHADE;
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = VEIL;
-      ctx.fillRect(0, 0, 256, 256);
     };
     let finished = false;
     const finish = () => {
@@ -1761,24 +1755,13 @@ map.on('resize', () => map.setMinZoom(2.5));
 
 map.attributionControl.setPrefix(false);
 
-const baseLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+const baseLayer = new CachedTiles({
   minZoom: 2,
   maxZoom: 16,
   keepBuffer: 3,
   updateWhenZooming: false,
   updateInterval: 100,
-  crossOrigin: true,
   attribution: 'Tiles &copy; Esri'
-}).addTo(map);
-
-const refLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-  minZoom: 2,
-  maxZoom: 16,
-  keepBuffer: 3,
-  updateWhenZooming: false,
-  updateInterval: 100,
-  crossOrigin: true,
-  pane: 'overlayPane'
 }).addTo(map);
 
 (window.requestIdleCallback || (cb => setTimeout(cb, 1500)))(() => {
@@ -2620,11 +2603,17 @@ function renderSightings() {
         L.polyline(sg.route, {color, weight: 5, opacity: faded ? 0.4 : 0.9, dashArray: '1 9', lineCap: 'round', interactive: false}).addTo(sightLayer);
       }
       const countBadge = showCount ? `<div class="sight-count">${i + 1}</div>` : '';
+      const kindLabel = KINDS[sg.kind].label;
       const icon = L.divIcon({
         className: 'sight-icon',
-        html: `<div class="sight" style="--c:${color}"><span class="sight-body">${ICONS[sg.kind](color)}</span>${countBadge}</div>`,
-        iconSize: [40, 50],
-        iconAnchor: [20 - dx, 46]
+        html: `<div class="sight" style="--c:${color}">
+          <div class="sight-pin">
+            <span class="sight-body">${ICONS[sg.kind](color)}</span>${countBadge}
+          </div>
+          <div class="sight-label">${kindLabel}</div>
+        </div>`,
+        iconSize: [60, 68],
+        iconAnchor: [30 - dx, 60]
       });
       L.marker([sg.station.lat, sg.station.lng], {
         icon,
