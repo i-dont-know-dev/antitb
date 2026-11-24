@@ -2110,12 +2110,30 @@ function update3DGate() {
   }
 }
 
+const FALLBACK_LAND = {midnight: '#1b2740', amoled: '#101010', graphite: '#1d1e22', forest: '#0b3f47', paper: '#f4f3ec'};
+const FALLBACK_BORDER = {midnight: '#2b3a58', amoled: '#262626', graphite: '#2d2e34', forest: '#17505a', paper: '#d8d6cb'};
+const FALLBACK_TEXT = {midnight: '#9eadd5', amoled: '#c4c4c4', graphite: '#e87330', forest: '#ac8f56', paper: '#1f2329'};
+const FALLBACK_CITIES = {type: 'FeatureCollection', features: [
+  {type: 'Feature', properties: {name: 'Москва', rank: 1}, geometry: {type: 'Point', coordinates: [37.6176, 55.7517]}},
+  {type: 'Feature', properties: {name: 'Санкт-Петербург', rank: 2}, geometry: {type: 'Point', coordinates: [30.3351, 59.9343]}}
+]};
 let basemapFallback = false;
 function activateRasterFallback() {
   if (basemapFallback) return;
   basemapFallback = true;
   try {
-    const dark = (THEME_DEFS[currentTheme] || THEME_DEFS.midnight).flavor !== 'light';
+    const themeName = THEME_DEFS[currentTheme] ? currentTheme : 'midnight';
+    const dark = THEME_DEFS[themeName].flavor !== 'light';
+    const land = FALLBACK_LAND[themeName] || (dark ? '#1b2740' : '#f4f3ec');
+    const border = FALLBACK_BORDER[themeName] || (dark ? '#2b3a58' : '#d8d6cb');
+    const text = FALLBACK_TEXT[themeName] || (dark ? '#9eadd5' : '#1f2329');
+    const halo = dark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.75)';
+    if (!map.getSource('land-fb')) map.addSource('land-fb', {type: 'geojson', data: './vendor/land-50m.geojson', attribution: '© Natural Earth'});
+    if (!map.getSource('borders-fb')) map.addSource('borders-fb', {type: 'geojson', data: './vendor/borders-50m.geojson'});
+    if (!map.getSource('cities-fb')) map.addSource('cities-fb', {type: 'geojson', data: FALLBACK_CITIES});
+    if (!map.getLayer('land-fill-fb')) map.addLayer({id: 'land-fill-fb', type: 'fill', source: 'land-fb', paint: {'fill-color': land, 'fill-opacity': 1}}, 'buildings-3d');
+    if (!map.getLayer('land-borders-fb')) map.addLayer({id: 'land-borders-fb', type: 'line', source: 'borders-fb', paint: {'line-color': border, 'line-width': 0.9, 'line-opacity': 0.9}}, 'buildings-3d');
+    if (!map.getLayer('cities-label-fb')) map.addLayer({id: 'cities-label-fb', type: 'symbol', source: 'cities-fb', layout: {'text-field': ['get', 'name'], 'text-font': ['Noto Sans Medium'], 'text-size': ['match', ['get', 'rank'], 1, 16, 13], 'text-halo-color': halo, 'text-halo-width': 1.6, 'text-letter-spacing': 0.02, 'text-allow-overlap': true}, paint: {'text-color': text}}, 'buildings-3d');
     const baseUrl = dark
       ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
       : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
@@ -2128,17 +2146,23 @@ function activateRasterFallback() {
     if (!map.getSource('esri-reference')) {
       map.addSource('esri-reference', {type: 'raster', tiles: [refUrl], tileSize: 256, maxzoom: 16});
     }
-    map.addLayer({id: 'esri-base', type: 'raster', source: 'esri-base'}, 'buildings-3d');
-    map.addLayer({id: 'esri-reference', type: 'raster', source: 'esri-reference'}, 'buildings-3d');
+    if (!map.getLayer('esri-base')) map.addLayer({id: 'esri-base', type: 'raster', source: 'esri-base'}, 'buildings-3d');
+    if (!map.getLayer('esri-reference')) map.addLayer({id: 'esri-reference', type: 'raster', source: 'esri-reference'}, 'buildings-3d');
     const note = $('basemapNote');
-    if (note) note.textContent = 'Подложка: Esri Gray Canvas · © Esri, Maxar (запасной вариант).';
+    if (note) note.textContent = 'Подложка: запасная (Natural Earth · Esri Gray Canvas) — Protomaps недоступен.';
   } catch (err) {
-    console.warn('raster fallback failed', err);
+    console.warn('basemap fallback failed', err);
   }
 }
 map.on('error', e => {
-  if (e && e.sourceId === 'protomaps') activateRasterFallback();
+  const src = e && (e.sourceId || '');
+  const msg = e && e.error && (e.error.message || String(e.error)) || '';
+  if (src === 'protomaps' || /protomaps|build\.protomaps/i.test(src + ' ' + msg)) activateRasterFallback();
 });
+window.setTimeout(() => {
+  if (basemapFallback) return;
+  try { if (!map.isSourceLoaded('protomaps')) activateRasterFallback(); } catch { activateRasterFallback(); }
+}, 12000);
 
 map.on('zoomend', () => { renderTrains(); update3DGate(); });
 map.on('moveend', () => { renderTrains(); update3DGate(); });
