@@ -1859,7 +1859,7 @@ function buildStyle(themeName) {
   const mcd = state.mcd;
   return {
     version: 8,
-    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
+    glyphs: './vendor/fonts/{fontstack}/{range}.pbf',
     sources: {
       protomaps: {type: 'vector', url: 'pmtiles://https://build.protomaps.com/20261124.pmtiles', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · <a href="https://protomaps.com">Protomaps</a>'},
       veil: {type: 'geojson', data: veilFC},
@@ -2045,6 +2045,35 @@ function update3DGate() {
   }
 }
 
+let basemapFallback = false;
+function activateRasterFallback() {
+  if (basemapFallback) return;
+  basemapFallback = true;
+  try {
+    const flavor = (THEME_DEFS[currentTheme] || THEME_DEFS.midnight).flavor;
+    const dark = flavor !== 'light';
+    if (!map.getSource('carto-raster')) {
+      map.addSource('carto-raster', {
+        type: 'raster',
+        tiles: dark
+          ? ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', 'https://basemaps2.cartocdn.com/dark_all/{z}/{x}/{y}.png', 'https://basemaps3.cartocdn.com/dark_all/{z}/{x}/{y}.png']
+          : ['https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', 'https://basemaps2.cartocdn.com/light_all/{z}/{x}/{y}.png', 'https://basemaps3.cartocdn.com/light_all/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>'
+      });
+    }
+    map.addLayer({id: 'carto-raster', type: 'raster', source: 'carto-raster'}, 'buildings-3d');
+    const note = $('basemapNote');
+    if (note) note.textContent = 'Подложка: CARTO · данные © OpenStreetMap (запасной вариант).';
+  } catch (err) {
+    console.warn('raster fallback failed', err);
+  }
+}
+map.on('error', e => {
+  if (e && e.sourceId === 'protomaps') activateRasterFallback();
+});
+
 map.on('zoomend', () => { renderTrains(); update3DGate(); });
 map.on('moveend', () => { renderTrains(); update3DGate(); });
 map.on('move', () => { update3DGate(); });
@@ -2168,6 +2197,7 @@ function applyTheme(t) {
   try { localStorage.setItem('antitb-theme', t); } catch (e) { /* private mode */ }
   syncThemeUI(t);
   if (map) {
+    basemapFallback = false;
     map.setStyle(buildStyle(t));
     map.once('style.load', () => { refreshLines(); renderSightings(); update3DGate(); });
   }
