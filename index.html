@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b1224" id="metaThemeColor">
 <title>АнтиТБ</title>
 <script>try{var t=localStorage.getItem('antitb-theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
 <style>
 :root{
   --bg:#0b1224;
@@ -26,7 +26,6 @@
   --d4:#40b280;
   --shadow:0 4px 16px rgba(0,0,0,.3);
   --font:Roboto,system-ui,-apple-system,sans-serif;
-  --tile-filter:brightness(0.55) sepia(1) saturate(2.5) hue-rotate(195deg) contrast(1.1);
 }
 [data-theme="amoled"]{
   --bg:#000000;
@@ -41,7 +40,6 @@
   --primary-container:rgba(34,211,238,.18);
   --on-primary-container:#a5f3fc;
   --shadow:0 4px 18px rgba(0,0,0,.55);
-  --tile-filter:brightness(0.42) contrast(1.18) saturate(0.55);
 }
 [data-theme="graphite"]{
   --bg:#16171a;
@@ -56,7 +54,6 @@
   --primary-container:rgba(242,163,60,.2);
   --on-primary-container:#fcd34d;
   --shadow:0 4px 16px rgba(0,0,0,.4);
-  --tile-filter:grayscale(0.55) brightness(0.58) contrast(1.08);
 }
 [data-theme="forest"]{
   --bg:#0a1a12;
@@ -71,7 +68,6 @@
   --primary-container:rgba(52,211,153,.18);
   --on-primary-container:#a7f3d0;
   --shadow:0 4px 16px rgba(0,0,0,.42);
-  --tile-filter:sepia(0.9) saturate(1.8) hue-rotate(95deg) brightness(0.56) contrast(1.1);
 }
 [data-theme="paper"]{
   --bg:#efede6;
@@ -86,7 +82,6 @@
   --primary-container:rgba(67,56,202,.12);
   --on-primary-container:#3730a3;
   --shadow:0 4px 16px rgba(31,35,41,.18);
-  --tile-filter:none;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{
@@ -116,35 +111,20 @@ button,input{font:inherit;color:inherit}
   z-index:0;
   background:var(--bg);
 }
-.leaflet-container{
+.maplibregl-map{
   background:var(--bg)!important;
   font-family:var(--font)!important;
 }
-.leaflet-tile{
-  filter:var(--tile-filter);
-}
-.leaflet-control-attribution{
+.maplibregl-canvas:focus{outline:none}
+.maplibregl-ctrl-attrib{
   font-size:10px!important;
   background:color-mix(in srgb, var(--surface) 88%, transparent)!important;
   color:var(--on-surface-variant)!important;
-  border-radius:8px 0 0 0!important;
+  border-radius:8px 8px 0 0!important;
+  max-width:62vw;
 }
-.leaflet-control-attribution a{color:var(--on-primary-container)!important}
-.mcd-station-label{
-  background:transparent!important;
-  border:0!important;
-  box-shadow:none!important;
-  color:var(--on-surface)!important;
-  font-family:var(--font)!important;
-  font-size:11.5px!important;
-  font-weight:600!important;
-  padding:2px 4px!important;
-  text-shadow:0 0 3px var(--bg), 0 0 3px var(--bg);
-  pointer-events:auto;
-  cursor:pointer;
-}
-.mcd-station-label:hover{color:var(--on-primary-container)!important}
-.mcd-station-label::before{display:none!important}
+.maplibregl-ctrl-attrib a{color:var(--on-primary-container)!important}
+.legend-hint{margin-top:7px;padding-top:7px;border-top:1px solid var(--outline-variant);color:var(--on-surface-variant);font-size:10px;line-height:1.35}
 .top-overlay{
   position:absolute;
   z-index:500;
@@ -656,6 +636,7 @@ input{user-select:text}
     <div class="legend-row"><span class="legend-line" id="legendLineD3" style="background:var(--d3)"></span>D3 · Ленинградско-Казанский</div>
     <div class="legend-row"><span class="legend-line" id="legendLineD4" style="background:var(--d4)"></span>D4 · Калужско-Нижегородский</div>
     <div class="legend-row"><span class="legend-line" style="background:#8a93a6;height:2px"></span>Направления ЦППК</div>
+    <div class="legend-hint">Колесо — плавный зум · ПКМ/Ctrl + перетаскивание — наклон (3D вдоль линий)</div>
   </div>
   <div class="map-fabs" id="mapControls">
     <button class="fab zoom-fab" id="zoomIn" aria-label="Приблизить">
@@ -818,7 +799,7 @@ input{user-select:text}
       </div>
       <p class="attribution-note" id="sightStatus"></p>
     </div>
-    <p class="attribution-note" id="basemapNote">Подложка: Esri World Dark Gray Base.</p>
+    <p class="attribution-note" id="basemapNote">Подложка: Protomaps · данные © OpenStreetMap.</p>
   </section>
   <div class="dock-wrap">
     <nav class="mac-dock" id="macDock" aria-label="Основная навигация">
@@ -842,9 +823,11 @@ input{user-select:text}
     </nav>
   </div>
 </div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-(function(){
+<script src="vendor/pmtiles.js"></script>
+<script type="module">
+import maplibregl from './vendor/maplibre-gl.mjs';
+const __protocol = new pmtiles.Protocol();
+maplibregl.addProtocol('pmtiles', __protocol.tile);
 const LINES = {
     D1: {
       name: 'МЦД-1',
@@ -1741,168 +1724,19 @@ const OLD_GRACE = 5 * 60 * 1000;
 const DELETE_GRACE = 5 * 60 * 1000;
 const MCD_CENTER = [55.755, 37.62];
 const MCD_INIT_ZOOM = 10;
-const crs = L.CRS.EPSG3857;
-const WORLD_M = 40075016.686;
-const RADIUS = 4500000;
-const CORE_RADIUS = 600000;
 const STATION_MIN_ZOOM = 10.5;
 const TRUNK_STATION_ZOOM = 6;
 const LABEL_MIN_ZOOM = 12.5;
-const lineWeight = z => Math.min(5, Math.max(2.2, 2.2 + (z - 8) * 0.45));
-const TILE_BUILDERS = {
-  dark: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${z}/${y}/${x}`,
-  light: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Canvas/MapServer/tile/${z}/${y}/${x}`,
-};
 const THEME_DEFS = {
-  midnight: {tile: 'dark', note: 'Esri World Dark Gray Base'},
-  amoled:   {tile: 'dark', note: 'Esri World Dark Gray Base'},
-  graphite: {tile: 'dark', note: 'Esri World Dark Gray Base'},
-  forest:   {tile: 'dark', note: 'Esri World Dark Gray Base'},
-  paper:    {tile: 'light', note: 'Esri World Light Canvas Base'},
+  midnight: {flavor: 'dark',  veil: '#0b1224', label: '#f4f7fd', halo: '#0b1224', buildings: '#1d2740', meta: '#0b1224'},
+  amoled:   {flavor: 'dark',  veil: '#000000', label: '#e8eaed', halo: '#000000', buildings: '#131820', meta: '#000000'},
+  graphite: {flavor: 'dark',  veil: '#16171a', label: '#e6e6ea', halo: '#16171a', buildings: '#24252b', meta: '#16171a'},
+  forest:   {flavor: 'dark',  veil: '#0a1a12', label: '#e8f4ec', halo: '#0a1a12', buildings: '#16281e', meta: '#0a1a12'},
+  paper:    {flavor: 'light', veil: '#ece9df', label: '#1f2329', halo: '#ece9df', buildings: '#d9d4c6', meta: '#efede6'},
 };
-const THEME_META = {midnight: '#0b1224', amoled: '#000000', graphite: '#16171a', forest: '#0a1a12', paper: '#efede6'};
+const BASEMAP_NOTE = 'Подложка: Protomaps · данные © OpenStreetMap.';
 let currentTheme = document.documentElement.dataset.theme || 'midnight';
 if (!THEME_DEFS[currentTheme]) currentTheme = 'midnight';
-const TILE_URL = (z, x, y) => TILE_BUILDERS[THEME_DEFS[currentTheme].tile](z, x, y);
-
-const circleAt = (z, radius = RADIUS) => {
-  const c = crs.latLngToPoint(L.latLng(MCD_CENTER), z);
-  return {cx: c.x, cy: c.y, r: radius / (WORLD_M / (256 * 2 ** z))};
-};
-
-function tileHitsCircle(z, x, y, radius = RADIUS) {
-  const {cx, cy, r} = circleAt(z, radius);
-  const nx = Math.max(x * 256, Math.min(cx, x * 256 + 256));
-  const ny = Math.max(y * 256, Math.min(cy, y * 256 + 256));
-  return (nx - cx) ** 2 + (ny - cy) ** 2 <= r * r;
-}
-
-const tileCache = new Map();
-const TILE_CACHE_MAX = 1500;
-
-function loadTile(z, x, y) {
-  const key = `${currentTheme}/${z}/${x}/${y}`;
-  const hit = tileCache.get(key);
-  if (hit) {
-    tileCache.delete(key);
-    tileCache.set(key, hit);
-    return hit;
-  }
-  const promise = (async () => {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        return await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => resolve(img);
-          img.onerror = reject;
-          img.src = TILE_URL(z, x, y);
-        });
-      } catch {
-        await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
-      }
-    }
-    tileCache.delete(key);
-    throw new Error(key);
-  })();
-  tileCache.set(key, promise);
-  if (tileCache.size > TILE_CACHE_MAX) tileCache.delete(tileCache.keys().next().value);
-  return promise;
-}
-
-const CachedTiles = L.GridLayer.extend({
-  createTile(coords, done) {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 256;
-    const {x, y, z} = coords;
-    const ctx = canvas.getContext('2d');
-    const paint = img => {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(img, 0, 0, 256, 256);
-    };
-    let finished = false;
-    const finish = () => {
-      if (!finished) {
-        finished = true;
-        done(null, canvas);
-      }
-    };
-    const attempt = n => loadTile(z, x, y)
-      .then(img => { paint(img); finish(); })
-      .catch(() => {
-        finish();
-        if (n < 6) setTimeout(() => attempt(n + 1), 2500 * (n + 1));
-      });
-    attempt(0);
-    return canvas;
-  }
-});
-
-function prefetchTiles(minZ, maxZ, radius) {
-  const jobs = [];
-  for (let z = minZ; z <= maxZ; z++) {
-    const {cx, cy, r} = circleAt(z, radius);
-    for (let x = Math.floor((cx - r) / 256); x <= Math.floor((cx + r) / 256); x++)
-      for (let y = Math.floor((cy - r) / 256); y <= Math.floor((cy + r) / 256); y++)
-        if (tileHitsCircle(z, x, y, radius)) jobs.push([z, x, y]);
-  }
-  const worker = async () => {
-    while (jobs.length) {
-      const [z, x, y] = jobs.shift();
-      await loadTile(z, x, y).catch(() => {});
-    }
-  };
-  for (let i = 0; i < 3; i++) worker();
-}
-
-const centerM = crs.projection.project(L.latLng(MCD_CENTER));
-const MAP_BOUNDS = L.latLngBounds(
-  crs.projection.unproject(L.point(centerM.x - RADIUS, centerM.y - RADIUS)),
-  crs.projection.unproject(L.point(centerM.x + RADIUS, centerM.y + RADIUS))
-);
-
-const map = L.map('map', {
-  zoomControl: false,
-  attributionControl: true,
-  minZoom: 2.5,
-  maxZoom: 16,
-  zoomSnap: 0.25,
-  zoomDelta: 0.5,
-  wheelPxPerZoomLevel: 60,
-  wheelDebounceTime: 40,
-  maxBounds: MAP_BOUNDS,
-  maxBoundsViscosity: 0.0,
-  inertia: true,
-  inertiaDeceleration: 3400,
-  inertiaMaxSpeed: 2400,
-  easeLinearity: 0.2
-}).setView(MCD_CENTER, MCD_INIT_ZOOM);
-
-map.on('resize', () => map.setMinZoom(2.5));
-
-map.attributionControl.setPrefix(false);
-
-const baseLayer = new CachedTiles({
-  minZoom: 2,
-  maxZoom: 16,
-  keepBuffer: 3,
-  updateWhenZooming: false,
-  updateInterval: 100,
-  attribution: 'Tiles &copy; Esri'
-}).addTo(map);
-
-(window.requestIdleCallback || (cb => setTimeout(cb, 1500)))(() => {
-  prefetchTiles(5, 7, RADIUS);
-  prefetchTiles(8, 10, CORE_RADIUS);
-});
-
-map.createPane('linesPane').style.zIndex = 420;
-map.createPane('stationsPane').style.zIndex = 450;
-
-const renderers = {
-  lines: L.canvas({pane: 'linesPane', padding: 0.8}),
-  stations: L.canvas({pane: 'stationsPane', padding: 0.8})
-};
 
 const stationIndex = new Map();
 Object.entries(LINES).forEach(([code, line]) => {
@@ -1936,57 +1770,17 @@ ALL_STATIONS.forEach(st => {
 });
 
 const lineRank = l => l.trunk ? 2 : l.rail ? 1 : 0;
-const linePolylines = {};
-const orderedLines = Object.entries(LINES).sort(([, a], [, b]) => lineRank(b) - lineRank(a));
-const polyOpts = {pane: 'linesPane', renderer: renderers.lines, lineJoin: 'round', lineCap: 'round', interactive: false};
-
-const interpolatePath = (stations) => {
-  if (stations.length < 2) return stations.map(s => [s.lat, s.lng]);
-  const result = [];
-
-  const pts = stations.map(s => ({lat: s.lat, lng: s.lng}));
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[Math.max(0, i - 1)];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[Math.min(pts.length - 1, i + 2)];
-    const dist = Math.sqrt((p2.lat - p1.lat) ** 2 + (p2.lng - p1.lng) ** 2);
-
-    const steps = Math.max(4, Math.min(20, Math.round(dist * 80)));
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      const t2 = t * t, t3 = t2 * t;
-
-      const lat = 0.5 * ((2 * p1.lat) + (-p0.lat + p2.lat) * t + (2 * p0.lat - 5 * p1.lat + 4 * p2.lat - p3.lat) * t2 + (-p0.lat + 3 * p1.lat - 3 * p2.lat + p3.lat) * t3);
-      const lng = 0.5 * ((2 * p1.lng) + (-p0.lng + p2.lng) * t + (2 * p0.lng - 5 * p1.lng + 4 * p2.lng - p3.lng) * t2 + (-p0.lng + 3 * p1.lng - 3 * p2.lng + p3.lng) * t3);
-
-      if (s === 0 && result.length > 0) continue;
-      result.push([lat, lng]);
-    }
-  }
-  return result;
-};
-
-const lineCoords = line => interpolatePath(line.stations);
-orderedLines.forEach(([code, line]) => {
-  linePolylines[code] = {casing: L.polyline(lineCoords(line), {...polyOpts, color: '#050a18'}).addTo(map)};
+ALL_STATIONS.forEach((st, i) => {
+  st.id = i + 1;
+  const trunkOnly = st.lines.length > 0 && st.lines.every(c => LINES[c].trunk);
+  st.minZoom = trunkOnly ? TRUNK_STATION_ZOOM : STATION_MIN_ZOOM;
+  st.labelZ = trunkOnly ? TRUNK_STATION_ZOOM + 1.5 : LABEL_MIN_ZOOM;
+  st.multi = st.lines.length > 1;
+  st.color = st.lines.length
+    ? LINES[[...st.lines].sort((a, b) => lineRank(LINES[b]) - lineRank(LINES[a]))[0]].color
+    : '#94a3b8';
+  st.rank = st.lines.length ? Math.max(...st.lines.map(c => lineRank(LINES[c]))) : -1;
 });
-orderedLines.forEach(([code, line]) => {
-  linePolylines[code].main = L.polyline(lineCoords(line), {...polyOpts, color: line.color}).addTo(map);
-});
-
-const stationItems = ALL_STATIONS.map(st => {
-  const isMcd = st.lines.some(c => lineRank(LINES[c]) === 0);
-  const trunkOnly = st.lines.every(c => LINES[c].trunk);
-  const marker = L.circleMarker([st.lat, st.lng], {pane: 'stationsPane', renderer: renderers.stations, radius: 5});
-  marker.on('click', e => {
-    L.DomEvent.stopPropagation(e);
-    openStationSheet(st);
-  });
-  return {st, marker, isMcd, shown: false, minZ: trunkOnly ? TRUNK_STATION_ZOOM : STATION_MIN_ZOOM, labelZ: trunkOnly ? TRUNK_STATION_ZOOM + 1.5 : LABEL_MIN_ZOOM};
-});
-
-const stationLayer = L.layerGroup().addTo(map);
 
 const state = {
   mcd: true,
@@ -1998,6 +1792,171 @@ const state = {
   selected: null,
   focus: null
 };
+
+const isLineActive = code =>
+  state.filter === 'all' || state.filter === code || (state.filter === 'rail' && LINES[code].rail) || (state.filter === 'trunk' && LINES[code].trunk);
+
+const lineCorridors = Object.values(LINES).map(line => {
+  let w = 180, s = 90, e = -180, n = -90;
+  for (const st of line.stations) {
+    if (st.lng < w) w = st.lng;
+    if (st.lng > e) e = st.lng;
+    if (st.lat < s) s = st.lat;
+    if (st.lat > n) n = st.lat;
+  }
+  const pad = 0.035;
+  return {w: w - pad, s: s - pad, e: e + pad, n: n + pad};
+});
+const corridorIntersects = b => lineCorridors.some(c => c.w <= b.getEast() && c.e >= b.getWest() && c.s <= b.getNorth() && c.n >= b.getSouth());
+
+const linesFC = () => ({type: 'FeatureCollection', features: Object.entries(LINES).map(([code, line]) => ({
+  type: 'Feature',
+  properties: {code, color: line.color, rank: lineRank(line)},
+  geometry: {type: 'LineString', coordinates: line.stations.map(st => [st.lng, st.lat])}
+}))});
+
+const stationsFC = () => ({
+  type: 'FeatureCollection',
+  features: ALL_STATIONS.map(st => ({
+    type: 'Feature',
+    id: st.id,
+    properties: {
+      id: st.id,
+      name: st.name,
+      color: st.color,
+      multi: st.multi,
+      minZoom: st.minZoom,
+      labelZ: st.labelZ,
+      rank: st.rank,
+      active: state.filter === 'all' || st.lines.some(isLineActive)
+    },
+    geometry: {type: 'Point', coordinates: [st.lng, st.lat]}
+  }))
+});
+
+const [darkLayers, lightLayers, veilFC] = await Promise.all([
+  fetch('vendor/basemap-dark.json').then(r => { if (!r.ok) throw new Error('basemap-dark.json: ' + r.status); return r.json(); }),
+  fetch('vendor/basemap-light.json').then(r => { if (!r.ok) throw new Error('basemap-light.json: ' + r.status); return r.json(); }),
+  fetch('vendor/russia-veil.geojson').then(r => { if (!r.ok) throw new Error('russia-veil.geojson: ' + r.status); return r.json(); })
+]);
+
+const radiusStop = (z, base, multi) => [z, ['case', ['boolean', ['feature-state', 'selected'], false], 8.6, ['case', ['boolean', ['get', 'multi'], false], multi, base]]];
+const CIRCLE_RADIUS = ['interpolate', ['linear'], ['zoom'],
+  ...radiusStop(6, 2.6, 3.9), ...radiusStop(8, 3.5, 4.8), ...radiusStop(10, 4.6, 5.9),
+  ...radiusStop(12, 5.4, 6.7), ...radiusStop(14, 6.2, 7.5), ...radiusStop(16, 7.2, 8.5)];
+const matchCodes = (codes, onVal, offVal) => {
+  const expr = ['match', ['get', 'code']];
+  for (const c of codes) expr.push(c, onVal);
+  expr.push(offVal);
+  return expr;
+};
+
+function buildStyle(themeName) {
+  const t = THEME_DEFS[themeName] || THEME_DEFS.midnight;
+  const base = t.flavor === 'light' ? lightLayers : darkLayers;
+  const activeCodes = Object.keys(LINES).filter(isLineActive);
+  const mcd = state.mcd;
+  return {
+    version: 8,
+    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
+    sources: {
+      protomaps: {type: 'vector', url: 'pmtiles://https://build.protomaps.com/20261124.pmtiles', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · <a href="https://protomaps.com">Protomaps</a>'},
+      veil: {type: 'geojson', data: veilFC},
+      lines: {type: 'geojson', data: linesFC()},
+      stations: {type: 'geojson', data: stationsFC()},
+      sight: {type: 'geojson', data: {type: 'FeatureCollection', features: []}}
+    },
+    layers: [
+      ...base,
+      {id: 'buildings-3d', type: 'fill-extrusion', source: 'protomaps', 'source-layer': 'buildings', filter: ['in', 'kind', 'building', 'building_part'], minzoom: 13, layout: {visibility: 'none'}, paint: {
+        'fill-extrusion-color': t.buildings,
+        'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 14],
+        'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+        'fill-extrusion-opacity': 0.82
+      }},
+      {id: 'veil', type: 'fill', source: 'veil', paint: {'fill-color': t.veil, 'fill-opacity': 1}},
+      {id: 'line-casing', type: 'line', source: 'lines', layout: {'line-join': 'round', 'line-cap': 'round', 'line-sort-key': ['get', 'rank'], visibility: mcd ? 'visible' : 'none'}, paint: {
+        'line-color': '#050a18',
+        'line-width': ['interpolate', ['exponential', 2], ['zoom'], 6, 2.2, 8, 3, 11, 4, 13, 5.2, 16, 8],
+        'line-opacity': mcd ? matchCodes(activeCodes, 0.92, 0.18) : 0
+      }},
+      {id: 'line-main', type: 'line', source: 'lines', layout: {'line-join': 'round', 'line-cap': 'round', 'line-sort-key': ['get', 'rank'], visibility: mcd ? 'visible' : 'none'}, paint: {
+        'line-color': ['get', 'color'],
+        'line-width': ['interpolate', ['exponential', 2], ['zoom'], 6, 1.1, 8, 1.6, 11, 2.4, 13, 3.1, 16, 5.2],
+        'line-opacity': mcd ? matchCodes(activeCodes, 0.98, 0.25) : 0
+      }},
+      {id: 'sight-routes', type: 'line', source: 'sight', layout: {'line-cap': 'round'}, paint: {
+        'line-color': ['get', 'color'],
+        'line-width': 5,
+        'line-opacity': 0.9,
+        'line-dasharray': [0.2, 2.4]
+      }},
+      {id: 'stations-circle-trunk', type: 'circle', source: 'stations', minzoom: 6, filter: ['all', ['==', ['get', 'active'], true], ['==', ['get', 'rank'], 2]], layout: {visibility: mcd ? 'visible' : 'none'}, paint: {
+        'circle-radius': CIRCLE_RADIUS,
+        'circle-color': ['case', ['boolean', ['get', 'multi'], false], '#ffffff', ['get', 'color']],
+        'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#818cf8', '#050a18'],
+        'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2.6, 2],
+        'circle-opacity': 0.97,
+        'circle-stroke-opacity': 1
+      }},
+      {id: 'stations-circle', type: 'circle', source: 'stations', minzoom: 10.5, filter: ['all', ['==', ['get', 'active'], true], ['<', ['get', 'rank'], 2]], layout: {visibility: mcd ? 'visible' : 'none'}, paint: {
+        'circle-radius': CIRCLE_RADIUS,
+        'circle-color': ['case', ['boolean', ['get', 'multi'], false], '#ffffff', ['get', 'color']],
+        'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#818cf8', '#050a18'],
+        'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2.6, 2],
+        'circle-opacity': 0.97,
+        'circle-stroke-opacity': 1
+      }},
+      {id: 'station-labels-trunk', type: 'symbol', source: 'stations', minzoom: 7.5, filter: ['all', ['==', ['get', 'active'], true], ['==', ['get', 'rank'], 2]], layout: {
+        visibility: mcd && state.labels ? 'visible' : 'none',
+        'text-field': ['get', 'name'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 11.5,
+        'text-offset': [0.9, 0],
+        'text-anchor': 'left',
+        'text-padding': 2,
+        'symbol-sort-key': ['get', 'rank']
+      }, paint: {
+        'text-color': t.label,
+        'text-halo-color': t.halo,
+        'text-halo-width': 1.6
+      }},
+      {id: 'station-labels', type: 'symbol', source: 'stations', minzoom: 12.5, filter: ['all', ['==', ['get', 'active'], true], ['<', ['get', 'rank'], 2]], layout: {
+        visibility: mcd && state.labels ? 'visible' : 'none',
+        'text-field': ['get', 'name'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 11.5,
+        'text-offset': [0.9, 0],
+        'text-anchor': 'left',
+        'text-padding': 2,
+        'symbol-sort-key': ['get', 'rank']
+      }, paint: {
+        'text-color': t.label,
+        'text-halo-color': t.halo,
+        'text-halo-width': 1.6
+      }}
+    ]
+  };
+}
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: buildStyle(currentTheme),
+  center: [37.62, 55.755],
+  zoom: 10,
+  minZoom: 2,
+  maxZoom: 18,
+  pitch: 0,
+  maxPitch: 62,
+  antialias: true,
+  attributionControl: false
+});
+map.addControl(new maplibregl.AttributionControl({compact: true}));
+
+let autoPitched = false;
+let userPitched = false;
+let autoPitching = false;
+map.on('pitchend', () => { if (!autoPitching) userPitched = true; });
 
 const $ = id => document.getElementById(id);
 const stationSheet = $('stationSheet');
@@ -2021,7 +1980,7 @@ function openStationSheet(st) {
   $('sheetDesc').textContent = st.info;
   $('sheetMeta').textContent = `${st.lat.toFixed(4)}, ${st.lng.toFixed(4)}`;
   stationSheet.classList.add('open');
-  updateStations();
+  applySelection();
 }
 
 function closeStationSheet() {
@@ -2029,77 +1988,96 @@ function closeStationSheet() {
   state.focus = null;
   if (state.selected) {
     state.selected = null;
-    updateStations();
+    applySelection();
   }
 }
 
-const isLineActive = code =>
-  state.filter === 'all' || state.filter === code || (state.filter === 'rail' && LINES[code].rail) || (state.filter === 'trunk' && LINES[code].trunk);
 
-function updateStations() {
-  const z = map.getZoom();
-  const view = map.getBounds().pad(0.2);
-  stationItems.forEach(item => {
-    const {st, marker, isMcd} = item;
-    const visible = state.mcd && z >= item.minZ && st.lines.some(isLineActive) && view.contains(marker.getLatLng());
-    if (!visible) {
-      if (item.shown) { stationLayer.removeLayer(marker); item.shown = false; }
-      return;
-    }
-    const multi = st.lines.length > 1;
-    const code = st.lines.find(isLineActive) || st.lines[0];
-    const selected = state.selected === st;
-    marker.setStyle({
-      radius: selected ? 8 : multi ? 6.2 : 5.2,
-      fillColor: multi ? '#ffffff' : LINES[code].color,
-      fillOpacity: 1,
-      color: selected ? '#818cf8' : '#050a18',
-      weight: selected ? 2.6 : 2
-    });
-    if (!item.shown) { stationLayer.addLayer(marker); item.shown = true; }
-    if (isMcd) marker.bringToFront();
-    const wantLabel = state.labels && z >= item.labelZ;
-    if (wantLabel && !marker.getTooltip()) {
-      marker.bindTooltip(st.name, {permanent: true, direction: 'right', offset: [7, 0], className: 'mcd-station-label', interactive: true});
-      const tip = marker.getTooltip();
-      const tipEl = tip.getElement && tip.getElement();
-      if (tipEl) {
-        tipEl.addEventListener('click', e => { L.DomEvent.stopPropagation(e); openStationSheet(st); });
-      } else {
-        marker.once('tooltipopen', () => {
-          const el = marker.getTooltip().getElement();
-          if (el) el.addEventListener('click', e => { L.DomEvent.stopPropagation(e); openStationSheet(st); });
-        });
-      }
-    } else if (!wantLabel && marker.getTooltip()) {
-      marker.unbindTooltip();
-    }
-  });
+function applySelection() {
+  if (!map.getSource('stations')) return;
+  for (const st of ALL_STATIONS) {
+    map.setFeatureState({source: 'stations', id: st.id}, {selected: state.selected === st});
+  }
 }
 
 function refreshLines() {
-  const w = lineWeight(map.getZoom());
-  Object.entries(LINES).forEach(([code, line]) => {
-    const pair = linePolylines[code];
-    const active = isLineActive(code);
-    const width = active ? w : w * 0.6;
-    pair.main.setStyle({color: line.color, weight: width, opacity: state.mcd ? (active ? 0.98 : 0.25) : 0});
-    pair.casing.setStyle({weight: width + 2.5, opacity: state.mcd ? (active ? 0.92 : 0.18) : 0});
-  });
-  updateStations();
+  const on = state.mcd;
+  const actMain = ['match', ['get', 'code']];
+  const actCase = ['match', ['get', 'code']];
+  const activeCodes = Object.keys(LINES).filter(isLineActive);
+  for (const c of activeCodes) { actMain.push(c, 0.98); actCase.push(c, 0.92); }
+  actMain.push(0.25); actCase.push(0.18);
+  if (map.getLayer('line-main')) {
+    map.setLayoutProperty('line-casing', 'visibility', on ? 'visible' : 'none');
+    map.setLayoutProperty('line-main', 'visibility', on ? 'visible' : 'none');
+    map.setLayoutProperty('stations-circle', 'visibility', on ? 'visible' : 'none');
+    map.setLayoutProperty('stations-circle-trunk', 'visibility', on ? 'visible' : 'none');
+    map.setLayoutProperty('station-labels', 'visibility', on && state.labels ? 'visible' : 'none');
+    map.setLayoutProperty('station-labels-trunk', 'visibility', on && state.labels ? 'visible' : 'none');
+    map.setPaintProperty('line-main', 'line-opacity', on ? actMain : 0);
+    map.setPaintProperty('line-casing', 'line-opacity', on ? actCase : 0);
+  }
+  const src = map.getSource('stations');
+  if (src) src.setData(stationsFC());
+  const lsrc = map.getSource('lines');
+  if (lsrc) lsrc.setData(linesFC());
+  applySelection();
 }
 
-map.on('zoomend', () => { refreshLines(); renderTrains(); });
-map.on('moveend', () => { updateStations(); renderTrains(); });
-map.on('click', closeStationSheet);
+function update3DGate() {
+  if (!map.getLayer('buildings-3d')) return;
+  const show = corridorIntersects(map.getBounds()) && map.getZoom() >= 13;
+  const current = map.getLayoutProperty('buildings-3d', 'visibility');
+  if (current !== (show ? 'visible' : 'none')) map.setLayoutProperty('buildings-3d', 'visibility', show ? 'visible' : 'none');
+  if (show && !autoPitched && !userPitched && map.getPitch() < 15) {
+    autoPitched = true;
+    autoPitching = true;
+    map.easeTo({pitch: 52, duration: 900});
+    window.setTimeout(() => { autoPitching = false; }, 950);
+  } else if (!show && autoPitched) {
+    autoPitched = false;
+    if (!userPitched && map.getPitch() > 15) {
+      autoPitching = true;
+      map.easeTo({pitch: 0, duration: 800});
+      window.setTimeout(() => { autoPitching = false; }, 850);
+    }
+  }
+}
+
+map.on('zoomend', () => { renderTrains(); update3DGate(); });
+map.on('moveend', () => { renderTrains(); update3DGate(); });
+map.on('move', () => { update3DGate(); });
+map.on('load', () => {
+  refreshLines();
+  renderSightings();
+  update3DGate();
+});
+map.on('click', e => {
+  const target = e.originalEvent && e.originalEvent.target;
+  if (target && target.closest && target.closest('.train-icon,.sight-icon')) return;
+  const hits = map.queryRenderedFeatures(e.point, {layers: ['stations-circle', 'stations-circle-trunk', 'station-labels', 'station-labels-trunk']});
+  if (hits.length) return;
+  closeStationSheet();
+});
+['stations-circle', 'stations-circle-trunk', 'station-labels', 'station-labels-trunk'].forEach(layerId => {
+  map.on('click', layerId, e => {
+    const f = e.features && e.features[0];
+    const st = f && ALL_STATIONS[f.properties.id - 1];
+    if (st) openStationSheet(st);
+  });
+});
+['stations-circle', 'stations-circle-trunk', 'station-labels', 'station-labels-trunk'].forEach(layerId => {
+  map.on('mousemove', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+});
 
 $('closeSheetBtn').addEventListener('click', closeStationSheet);
 $('focusStationBtn').addEventListener('click', () => {
-  if (state.focus) map.flyTo([state.focus.lat, state.focus.lng], 14, {duration: 0.9});
+  if (state.focus) map.flyTo({center: [state.focus.lng, state.focus.lat], zoom: 14, duration: 900});
 });
-$('zoomIn').addEventListener('click', () => map.zoomIn());
-$('zoomOut').addEventListener('click', () => map.zoomOut());
-$('centerBtn').addEventListener('click', () => map.flyTo(MCD_CENTER, MCD_INIT_ZOOM, {duration: 0.9}));
+$('zoomIn').addEventListener('click', () => map.easeTo({zoom: map.getZoom() + 0.75, duration: 200}));
+$('zoomOut').addEventListener('click', () => map.easeTo({zoom: map.getZoom() - 0.75, duration: 200}));
+$('centerBtn').addEventListener('click', () => map.flyTo({center: [MCD_CENTER[1], MCD_CENTER[0]], zoom: MCD_INIT_ZOOM, duration: 900}));
 
 const searchInput = $('searchInput');
 const searchResults = $('searchResults');
@@ -2142,7 +2120,7 @@ function renderSearch(query) {
       searchResults.classList.remove('open');
       searchInput.value = st.name;
       searchInput.blur();
-      map.flyTo([st.lat, st.lng], 13.5, {duration: 0.9});
+      map.flyTo({center: [st.lng, st.lat], zoom: 13.5, duration: 900});
       openStationSheet(st);
     });
     searchResults.append(btn);
@@ -2172,27 +2150,32 @@ chips.forEach(chip => chip.addEventListener('click', () => {
 }));
 
 const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-function applyTheme(t) {
-  if (!THEME_DEFS[t]) return;
-  currentTheme = t;
-  document.documentElement.dataset.theme = t;
-  if (metaThemeColor) metaThemeColor.setAttribute('content', THEME_META[t] || '#0b1224');
-  try { localStorage.setItem('antitb-theme', t); } catch (e) { /* private mode */ }
+function syncThemeUI(t) {
+  if (metaThemeColor) metaThemeColor.setAttribute('content', THEME_DEFS[t].meta);
   document.querySelectorAll('#themeGrid .theme-dot').forEach(btn => {
     const active = btn.dataset.theme === t;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', String(active));
   });
   const note = $('basemapNote');
-  if (note) note.textContent = `Подложка: ${THEME_DEFS[t].note}.`;
-  tileCache.clear();
-  if (baseLayer) baseLayer.redraw();
+  if (note) note.textContent = BASEMAP_NOTE;
+}
+function applyTheme(t) {
+  if (!THEME_DEFS[t]) return;
+  currentTheme = t;
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem('antitb-theme', t); } catch (e) { /* private mode */ }
+  syncThemeUI(t);
+  if (map) {
+    map.setStyle(buildStyle(t));
+    map.once('style.load', () => { refreshLines(); renderSightings(); update3DGate(); });
+  }
 }
 $('themeGrid').addEventListener('click', e => {
   const btn = e.target.closest('.theme-dot');
   if (btn) applyTheme(btn.dataset.theme);
 });
-applyTheme(currentTheme);
+syncThemeUI(currentTheme);
 
 const PROXIES = [
   ...(WORKER_URL ? [{url: () => WORKER_URL + '/api/news', timeout: 15000}] : []),
@@ -2399,8 +2382,9 @@ function syncStore(list) {
   });
 }
 
-const sightLayer = L.layerGroup().addTo(map);
-const trainLayer = L.layerGroup().addTo(map);
+const sightMarkers = [];
+const trainMarkerEls = [];
+const clearMarkerList = list => { while (list.length) list.pop().remove(); };
 
 function findTrainStation(name) {
   const norm = n => n.toLowerCase().replace(/ё/g, 'е').replace(/[^а-яa-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -2442,24 +2426,11 @@ function findTrainPath(stops) {
       const max = Math.max(...indices);
       const pathStations = line.stations.slice(Math.min(min, max), Math.max(min, max) + 1);
 
-      const interpCoords = interpolatePath(pathStations);
-
-      const stationIndices = [];
-      let idx = 0;
-      for (let i = 0; i < pathStations.length; i++) {
-        stationIndices.push(idx);
-        if (i < pathStations.length - 1) {
-          const a = pathStations[i], b = pathStations[i + 1];
-          const dist = Math.sqrt((b.lat - a.lat) ** 2 + (b.lng - a.lng) ** 2);
-          const steps = Math.max(4, Math.min(20, Math.round(dist * 80)));
-          idx += steps + 1;
-        }
-      }
       return {
-        coords: interpCoords,
+        coords: pathStations.map(st => [st.lat, st.lng]),
         lineCode: code,
         lineName: line.name,
-        stationIndices: indices.map(i => stationIndices[i - Math.min(min, max)])
+        stationIndices: indices.map(i => i - Math.min(min, max))
       };
     }
   }
@@ -2555,7 +2526,6 @@ function computeTrainPosition(schedule, now) {
   return null;
 }
 
-const trainMarkers = new Map();
 
 function openTrainSheet(schedule, pos) {
   const hadSelection = Boolean(state.selected);
@@ -2590,7 +2560,7 @@ function openTrainSheet(schedule, pos) {
   else if (pos.status === 'arrived') meta = `Конечная станция: ${pos.atStation}`;
   $('sheetMeta').textContent = meta;
   stationSheet.classList.add('open');
-  if (hadSelection) updateStations();
+  if (hadSelection) applySelection();
 }
 
 function bearingTransform(angle) {
@@ -2605,7 +2575,7 @@ function bearingTransform(angle) {
 }
 
 function renderTrains() {
-  trainLayer.clearLayers();
+  clearMarkerList(trainMarkerEls);
   if (!state.trains) return;
   const z = map.getZoom();
   if (z < TRAIN_MIN_ZOOM) return;
@@ -2626,36 +2596,30 @@ function renderTrains() {
       const [lat1, lng1] = pos.path.coords[idx];
       const [lat2, lng2] = pos.path.coords[next];
       if (Math.abs(lng2 - lng1) > 0.0001 || Math.abs(lat2 - lat1) > 0.0001) {
-        const p1 = map.latLngToLayerPoint([lat1, lng1]);
-        const p2 = map.latLngToLayerPoint([lat2, lng2]);
+        const p1 = map.project([lng1, lat1]);
+        const p2 = map.project([lng2, lat2]);
         ({rot, flip} = bearingTransform(Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI));
       }
     }
 
     const lineColor = TRAIN_LINE_COLORS[schedule.line] || '#818cf8';
 
-    const icon = detail
-      ? L.divIcon({
-          className: 'train-icon',
-          html: `<div class="train-detail" style="--c:${lineColor}">
+    const el = document.createElement('div');
+    el.className = 'train-icon';
+    el.innerHTML = detail
+      ? `<div class="train-detail" style="--c:${lineColor}">
         ${TRAIN_SVG[schedule.model](rot, flip)}
         <div class="train-detail-plaque">№${schedule.number}</div>
-      </div>`,
-          iconSize: [170, 74],
-          iconAnchor: [85, 28]
-        })
-      : L.divIcon({
-          className: 'train-icon',
-          html: `<div class="train-pin" style="--c:${lineColor}">
+      </div>`
+      : `<div class="train-pin" style="--c:${lineColor}">
         <span class="train-pin-body">${TRAIN_SVG[schedule.model](rot, flip)}</span>
         <span class="train-pin-label">№${schedule.number}</span>
-      </div>`,
-          iconSize: [44, 56],
-          iconAnchor: [22, 52]
-        });
-    L.marker([pos.lat, pos.lng], {icon, keyboard: false, zIndexOffset: 900})
-      .on('click', () => openTrainSheet(schedule, pos))
-      .addTo(trainLayer);
+      </div>`;
+    el.addEventListener('click', () => openTrainSheet(schedule, pos));
+    const marker = new maplibregl.Marker({element: el, anchor: detail ? 'center' : 'bottom'})
+      .setLngLat([pos.lng, pos.lat])
+      .addTo(map);
+    trainMarkerEls.push(marker);
   }
 }
 
@@ -2727,7 +2691,7 @@ function openSightingSheet(sg) {
   $('sheetDesc').textContent = lines.join('\n');
   $('sheetMeta').textContent = `${agoText(sg.age)} · ${sg.station.lat.toFixed(4)}, ${sg.station.lng.toFixed(4)}`;
   stationSheet.classList.add('open');
-  if (hadSelection) updateStations();
+  if (hadSelection) applySelection();
 }
 
 let sightCount = 0;
@@ -2755,9 +2719,11 @@ function updateSightStatus() {
 }
 
 function renderSightings() {
-  sightLayer.clearLayers();
+  clearMarkerList(sightMarkers);
   sightCount = 0;
+  const routeFeatures = [];
   if (!state.sightings) {
+    if (map.getSource('sight')) map.getSource('sight').setData({type: 'FeatureCollection', features: []});
     updateSightStatus();
     return;
   }
@@ -2793,24 +2759,22 @@ function renderSightings() {
       const dx = (i - (group.length - 1) / 2) * 42;
       const faded = sg.deleted || sg.expired || sg.age >= FADE_MS;
       if (sg.route && i === 0) {
-        L.polyline(sg.route, {color, weight: 5, opacity: faded ? 0.4 : 0.9, dashArray: '1 9', lineCap: 'round', interactive: false}).addTo(sightLayer);
+        routeFeatures.push({type: 'Feature', properties: {color}, geometry: {type: 'LineString', coordinates: sg.route.map(([lat, lng]) => [lng, lat])}});
       }
       const countBadge = showCount ? `<div class="sight-count">${i + 1}</div>` : '';
-      const icon = L.divIcon({
-        className: 'sight-icon',
-        html: `<div class="sight" style="--c:${color}"><span class="sight-body">${ICONS[sg.kind](color)}</span>${countBadge}</div>`,
-        iconSize: [40, 50],
-        iconAnchor: [20 - dx, 46]
-      });
-      L.marker([sg.station.lat, sg.station.lng], {
-        icon,
-        keyboard: false,
-        zIndexOffset: faded ? 500 : 1000,
-        opacity: faded ? 0.7 : 1
-      }).on('click', () => openSightingSheet(sg)).addTo(sightLayer);
+      const el = document.createElement('div');
+      el.className = 'sight-icon';
+      el.innerHTML = `<div class="sight" style="--c:${color}"><span class="sight-body">${ICONS[sg.kind](color)}</span>${countBadge}</div>`;
+      if (faded) el.style.opacity = '0.7';
+      el.addEventListener('click', () => openSightingSheet(sg));
+      const marker = new maplibregl.Marker({element: el, anchor: 'bottom', offset: [dx, 0]})
+        .setLngLat([sg.station.lng, sg.station.lat])
+        .addTo(map);
+      sightMarkers.push(marker);
       sightCount++;
     });
   });
+  if (map.getSource('sight')) map.getSource('sight').setData({type: 'FeatureCollection', features: routeFeatures});
   updateSightStatus();
 }
 
@@ -2995,8 +2959,8 @@ function switchTab(tab) {
   }
 
   if (tab === 'map') {
-    map.invalidateSize();
-    updateStations();
+    map.resize();
+    applySelection();
   }
 }
 
@@ -3039,7 +3003,7 @@ function bindToggle(rowId, switchId, key, apply) {
 }
 
 bindToggle('toggleMcdRow', 'switchMcd', 'mcd', refreshLines);
-bindToggle('toggleLabelsRow', 'switchLabels', 'labels', updateStations);
+bindToggle('toggleLabelsRow', 'switchLabels', 'labels', () => refreshLines());
 bindToggle('toggleSightRow', 'switchSight', 'sightings', renderSightings);
 bindToggle('toggleTrainsRow', 'switchTrains', 'trains', renderTrains);
 bindToggle('toggleLegendRow', 'switchLegend', 'legend', () => $('legendBox').classList.toggle('hidden', !state.legend));
@@ -3052,7 +3016,6 @@ renderNews();
 refreshPosts();
 setInterval(() => { refreshPosts(); renderSightings(); }, 60000);
 setInterval(renderTrains, TRAIN_UPDATE_MS);
-})();
 </script>
 </body>
 </html>
