@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
 <style>
 :root{
-  --bg:#0b1224;
+  --bg:#101523;
   --surface:#111a33;
   --surface-high:#1a2545;
   --on-surface:#edf2fa;
@@ -56,7 +56,7 @@
   --shadow:0 4px 16px rgba(0,0,0,.4);
 }
 [data-theme="forest"]{
-  --bg:#0a1a12;
+  --bg:#003237;
   --surface:#102217;
   --surface-high:#173023;
   --on-surface:#e8f4ec;
@@ -70,7 +70,7 @@
   --shadow:0 4px 16px rgba(0,0,0,.42);
 }
 [data-theme="paper"]{
-  --bg:#efede6;
+  --bg:#ffffff;
   --surface:#ffffff;
   --surface-high:#e7e4da;
   --on-surface:#1f2329;
@@ -1598,7 +1598,7 @@ try {
 const TG_CHANNEL = 'gdeseychastbiliantiki';
 const WORKER_URL = 'https://antitb-news.alik3ckx.workers.dev';
 const NEWS_LIMIT = 40;
-const FETCH_TTL = 45000;
+const FETCH_TTL = 1800;
 const ACTIVE_MS = 2 * 60 * 60 * 1000;
 const FADE_MS = 2 * 60 * 60 * 1000 + 30 * 60 * 1000;
 
@@ -1729,11 +1729,11 @@ const STATION_MIN_ZOOM = 10.5;
 const TRUNK_STATION_ZOOM = 6;
 const LABEL_MIN_ZOOM = 12.5;
 const THEME_DEFS = {
-  midnight: {flavor: 'dark',  veil: '#0b1224', label: '#f4f7fd', halo: '#0b1224', buildings: '#1d2740', meta: '#0b1224'},
-  amoled:   {flavor: 'dark',  veil: '#000000', label: '#e8eaed', halo: '#000000', buildings: '#131820', meta: '#000000'},
-  graphite: {flavor: 'dark',  veil: '#16171a', label: '#e6e6ea', halo: '#16171a', buildings: '#24252b', meta: '#16171a'},
-  forest:   {flavor: 'dark',  veil: '#0a1a12', label: '#e8f4ec', halo: '#0a1a12', buildings: '#16281e', meta: '#0a1a12'},
-  paper:    {flavor: 'light', veil: '#ece9df', label: '#1f2329', halo: '#ece9df', buildings: '#d9d4c6', meta: '#efede6'},
+  midnight: {flavor: 'dark',  veil: '#101523', label: '#ffffff', halo: '#101523', buildings: '#1d2a3c', meta: '#101523'},
+  amoled:   {flavor: 'dark',  veil: '#000000', label: '#c8c8c8', halo: '#000000', buildings: '#1a1a1a', meta: '#000000'},
+  graphite: {flavor: 'dark',  veil: '#16171a', label: '#f0f0f2', halo: '#16171a', buildings: '#232430', meta: '#16171a'},
+  forest:   {flavor: 'dark',  veil: '#003237', label: '#e3c878', halo: '#003237', buildings: '#10383f', meta: '#003237'},
+  paper:    {flavor: 'light', veil: '#ffffff', label: '#1f2329', halo: '#ffffff', buildings: '#d8d5cc', meta: '#ffffff'},
 };
 const BASEMAP_NOTE = 'Подложка: Protomaps · данные © OpenStreetMap.';
 let currentTheme = document.documentElement.dataset.theme || 'midnight';
@@ -1852,9 +1852,74 @@ const matchCodes = (codes, onVal, offVal) => {
   return expr;
 };
 
+const SYMBOL_LAYER_IDS = ['address_label', 'roads_labels_minor', 'roads_labels_major', 'roads_shields', 'water_waterway_label', 'water_label_ocean', 'water_label_lakes', 'earth_label_islands', 'pois', 'places_subplace', 'places_region', 'places_locality', 'places_country'];
+const recolor = (ids, paint) => Object.fromEntries(ids.map(id => [id, {paint}]));
+const toggle = (ids, on) => Object.fromEntries(ids.map(id => [id, {layout: {visibility: on ? 'visible' : 'none'}}]));
+const ROAD_MINOR = ['roads_minor', 'roads_minor_service', 'roads_other', 'roads_tunnels_minor', 'roads_tunnels_other', 'roads_bridges_minor', 'roads_bridges_other', 'roads_runway', 'roads_taxiway', 'roads_pier'];
+const ROAD_MAJOR = ['roads_major', 'roads_link', 'roads_tunnels_link', 'roads_tunnels_major', 'roads_bridges_link', 'roads_bridges_major'];
+const ROAD_HIGHWAY = ['roads_highway', 'roads_tunnels_highway', 'roads_bridges_highway'];
+const ROAD_CASING = ['roads_minor_casing', 'roads_link_casing', 'roads_major_casing_early', 'roads_major_casing_late', 'roads_highway_casing_early', 'roads_highway_casing_late', 'roads_tunnels_minor_casing', 'roads_tunnels_link_casing', 'roads_tunnels_major_casing', 'roads_tunnels_highway_casing', 'roads_tunnels_other_casing', 'roads_bridges_minor_casing', 'roads_bridges_link_casing', 'roads_bridges_major_casing', 'roads_bridges_highway_casing', 'roads_bridges_other_casing', 'roads_minor_service_casing'];
+
+// Google-Maps-style theme arrays, translated to MapLibre paint overrides
+function painter(t) {
+  const base = {
+    background: {paint: {'background-color': t.bg}},
+    earth: {paint: {'fill-color': t.bg}},
+    landcover: {paint: {'fill-color': t.landcover}},
+    landuse_park: {paint: {'fill-color': t.park}},
+    landuse_urban_green: {paint: {'fill-color': t.park}},
+    landuse_hospital: {paint: {'fill-color': t.landuse}},
+    landuse_industrial: {paint: {'fill-color': t.landuse}},
+    landuse_school: {paint: {'fill-color': t.landuse}},
+    landuse_beach: {paint: {'fill-color': t.landuse}},
+    landuse_zoo: {paint: {'fill-color': t.landuse}},
+    landuse_aerodrome: {paint: {'fill-color': t.landuse}},
+    landuse_pedestrian: {paint: {'fill-color': t.landuse}},
+    landuse_pier: {paint: {'fill-color': t.landuse}},
+    landuse_runway: {paint: {'fill-color': t.landuse}},
+    buildings: {paint: {'fill-color': t.buildingFlat, 'fill-opacity': 0.6}},
+    water: {paint: {'fill-color': t.water}},
+    water_stream: {paint: {'line-color': t.water}},
+    water_river: {paint: {'line-color': t.water}},
+    roads_rail: {paint: {'line-color': t.rail}},
+    boundaries_country: {paint: {'line-color': t.boundary, 'line-opacity': t.boundaryOpacity}},
+    boundaries: {paint: {'line-color': t.boundary, 'line-opacity': t.boundaryOpacity}},
+    ...recolor(ROAD_MINOR, {'line-color': t.minor}),
+    ...recolor(ROAD_MAJOR, {'line-color': t.major}),
+    ...recolor(ROAD_HIGHWAY, {'line-color': t.highway}),
+    ...recolor(ROAD_CASING, {'line-color': t.casing})
+  };
+  if (t.labelsOn === false) return {...base, ...toggle(SYMBOL_LAYER_IDS, false)};
+  const labels = {
+    ...recolor(['address_label', 'roads_labels_minor', 'roads_labels_major', 'roads_shields', 'earth_label_islands', 'pois'], {'text-color': t.labelMinor, 'text-halo-color': t.labelHalo}),
+    ...recolor(['places_subplace', 'places_region', 'places_locality'], {'text-color': t.labelPlace, 'text-halo-color': t.labelHalo}),
+    places_country: {paint: {'text-color': t.labelCountry, 'text-halo-color': t.labelHalo}}
+  };
+  Object.assign(labels, t.waterLabelsOff
+    ? toggle(['water_waterway_label', 'water_label_ocean', 'water_label_lakes'], false)
+    : recolor(['water_waterway_label', 'water_label_ocean', 'water_label_lakes'], {'text-color': t.labelWater, 'text-halo-color': t.labelHalo}));
+  return {...base, ...labels};
+}
+
+const THEME_PAINTERS = {
+  midnight: painter({bg: '#101523', landcover: '#141f2d', park: '#1c2b33', landuse: '#16222e', buildingFlat: '#182332', water: '#212c47', rail: '#243845', boundary: '#1a3541', boundaryOpacity: 1, minor: '#1d3c48', major: '#224452', highway: '#26505f', casing: '#0b1620', labelMinor: '#8fa1cf', labelPlace: '#9eadd5', labelCountry: '#9eadd5', labelWater: '#8fa1cf', labelHalo: '#101523'}),
+  amoled: painter({bg: '#000000', landcover: '#0d0d0d', park: '#101010', landuse: '#101010', buildingFlat: '#161616', water: '#2b2b2b', rail: '#262626', boundary: '#2b2b2b', boundaryOpacity: 1, minor: '#232323', major: '#4a4a4a', highway: '#1d63ef', casing: '#050505', labelMinor: '#999999', labelPlace: '#c4c4c4', labelCountry: '#8a8a8a', labelWater: '#666666', labelHalo: '#000000'}),
+  graphite: painter({bg: '#16171a', landcover: '#1b1b20', park: '#1a221f', landuse: '#1d1d22', buildingFlat: '#1d1d24', water: '#242424', rail: '#242424', boundary: '#2b2b2b', boundaryOpacity: 1, minor: '#292929', major: '#2e2e2e', highway: '#2b2b2b', casing: '#26262b', labelMinor: '#888888', labelPlace: '#e87330', labelCountry: '#e87330', labelWater: '#777777', labelHalo: '#16171a'}),
+  forest: painter({bg: '#003237', landcover: '#063a41', park: '#11454b', landuse: '#0e3a41', buildingFlat: '#10383f', water: '#19464b', rail: '#2a4b52', boundary: '#ffffff', boundaryOpacity: 0.32, minor: '#54727a', major: '#5d7b84', highway: '#668487', casing: '#00272c', labelMinor: '#ac8e55', labelPlace: '#ac8f56', labelCountry: '#ac8f56', labelHalo: '#003237', waterLabelsOff: true}),
+  paper: painter({bg: '#ffffff', landcover: '#f2f1ea', park: '#e9eee0', landuse: '#efeee8', buildingFlat: '#e6e4da', water: '#00539f', rail: '#d0cec4', boundary: '#b9b7ad', boundaryOpacity: 1, minor: '#ffffff', major: '#ffffff', highway: '#ffffff', casing: '#cfcdc2', labelsOn: false}),
+};
+const repaint = (layers, painters) => layers.map(l => {
+  const ov = painters[l.id];
+  if (!ov) return l;
+  const out = {...l};
+  if (ov.paint) out.paint = {...(l.paint || {}), ...ov.paint};
+  if (ov.layout) out.layout = {...(l.layout || {}), ...ov.layout};
+  return out;
+});
+
 function buildStyle(themeName) {
   const t = THEME_DEFS[themeName] || THEME_DEFS.midnight;
-  const base = t.flavor === 'light' ? lightLayers : darkLayers;
+  const base = repaint(t.flavor === 'light' ? lightLayers : darkLayers, THEME_PAINTERS[themeName] || THEME_PAINTERS.midnight);
   const activeCodes = Object.keys(LINES).filter(isLineActive);
   const mcd = state.mcd;
   return {
@@ -2050,22 +2115,23 @@ function activateRasterFallback() {
   if (basemapFallback) return;
   basemapFallback = true;
   try {
-    const flavor = (THEME_DEFS[currentTheme] || THEME_DEFS.midnight).flavor;
-    const dark = flavor !== 'light';
-    if (!map.getSource('carto-raster')) {
-      map.addSource('carto-raster', {
-        type: 'raster',
-        tiles: dark
-          ? ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', 'https://basemaps2.cartocdn.com/dark_all/{z}/{x}/{y}.png', 'https://basemaps3.cartocdn.com/dark_all/{z}/{x}/{y}.png']
-          : ['https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', 'https://basemaps2.cartocdn.com/light_all/{z}/{x}/{y}.png', 'https://basemaps3.cartocdn.com/light_all/{z}/{x}/{y}.png'],
-        tileSize: 256,
-        maxzoom: 19,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>'
-      });
+    const dark = (THEME_DEFS[currentTheme] || THEME_DEFS.midnight).flavor !== 'light';
+    const baseUrl = dark
+      ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+      : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+    const refUrl = dark
+      ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'
+      : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}';
+    if (!map.getSource('esri-base')) {
+      map.addSource('esri-base', {type: 'raster', tiles: [baseUrl], tileSize: 256, maxzoom: 16, attribution: '© Esri, Maxar, Earthstar Geographics'});
     }
-    map.addLayer({id: 'carto-raster', type: 'raster', source: 'carto-raster'}, 'buildings-3d');
+    if (!map.getSource('esri-reference')) {
+      map.addSource('esri-reference', {type: 'raster', tiles: [refUrl], tileSize: 256, maxzoom: 16});
+    }
+    map.addLayer({id: 'esri-base', type: 'raster', source: 'esri-base'}, 'buildings-3d');
+    map.addLayer({id: 'esri-reference', type: 'raster', source: 'esri-reference'}, 'buildings-3d');
     const note = $('basemapNote');
-    if (note) note.textContent = 'Подложка: CARTO · данные © OpenStreetMap (запасной вариант).';
+    if (note) note.textContent = 'Подложка: Esri Gray Canvas · © Esri, Maxar (запасной вариант).';
   } catch (err) {
     console.warn('raster fallback failed', err);
   }
@@ -3045,7 +3111,8 @@ renderTrains();
 
 renderNews();
 refreshPosts();
-setInterval(() => { refreshPosts(); renderSightings(); }, 60000);
+setInterval(() => { if (!document.hidden) { refreshPosts(); renderSightings(); } }, 2000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshPosts(); renderSightings(); } });
 setInterval(renderTrains, TRAIN_UPDATE_MS);
 </script>
 </body>
