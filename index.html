@@ -485,6 +485,14 @@ button,input{font:inherit;color:inherit}
 .setting-row:last-child{border-bottom:0;padding-bottom:2px}
 .setting-row strong{display:block;font-size:14px;font-weight:600}
 .setting-row small{display:block;font-size:12px;color:var(--on-surface-variant);margin-top:2px}
+.nav-badge{
+  position:absolute;top:2px;right:6px;min-width:18px;height:18px;padding:0 5px;
+  border-radius:9px;background:#e87330;color:#14100c;font-size:10px;font-weight:800;
+  line-height:18px;text-align:center;pointer-events:none;z-index:2;
+  box-shadow:0 0 0 2px var(--rail, #0b0f1c);
+}
+.nav-badge.pop{animation:badge-pop .35s ease}
+@keyframes badge-pop{0%{transform:scale(.4)}60%{transform:scale(1.35)}100%{transform:scale(1)}}
 .switch{
   width:44px;
   height:26px;
@@ -797,6 +805,14 @@ input{user-select:text}
         </div>
         <span class="switch on" id="switchLegend"></span>
       </div>
+      <div class="setting-row" id="toggleNotifyRow">
+        <div>
+          <strong>Уведомления о новых постах</strong>
+          <small>Бейдж на «Новости» всегда, системное уведомление — если браузер разрешит</small>
+        </div>
+        <span class="switch" id="switchNotify"></span>
+      </div>
+      <p class="attribution-note" id="notifyHint" hidden></p>
       <p class="attribution-note" id="sightStatus"></p>
     </div>
     <p class="attribution-note" id="basemapNote">Подложка: Protomaps · данные © OpenStreetMap.</p>
@@ -811,6 +827,7 @@ input{user-select:text}
       <button class="nav-btn" data-tab="news" data-idx="1">
         <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
         Новости
+        <span class="nav-badge" id="newsBadge" hidden></span>
       </button>
       <button class="nav-btn" data-tab="schedule" data-idx="2">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
@@ -2287,9 +2304,16 @@ function applyTheme(t) {
   try { localStorage.setItem('antitb-theme', t); } catch (e) { /* private mode */ }
   syncThemeUI(t);
   if (map) {
+    const wasFallback = basemapFallback;
     basemapFallback = false;
     map.setStyle(buildStyle(t));
-    map.once('style.load', () => { refreshLines(); renderSightings(); update3DGate(); });
+    map.once('style.load', () => {
+      refreshLines(); renderSightings(); update3DGate();
+      if (wasFallback) activateRasterFallback();
+      window.setTimeout(() => {
+        try { if (!map.isSourceLoaded('protomaps')) activateRasterFallback(); } catch (e) { activateRasterFallback(); }
+      }, 8000);
+    });
   }
 }
 $('themeGrid').addEventListener('click', e => {
@@ -3017,6 +3041,95 @@ function renderNews() {
   newsMessage('Загрузка', 'Получаем последние новости…');
 }
 
+const NEWS_SEEN_KEY = 'antitb-news-seen-max';
+const NEWS_NOTIFY_KEY = 'antitb-notify';
+let knownMaxPostId = 0;
+try { knownMaxPostId = Number(localStorage.getItem(NEWS_SEEN_KEY) || 0) || 0; } catch (e) { /* private mode */ }
+
+const validPostIds = list => list.filter(p => p.id > 0);
+const maxPostId = list => validPostIds(list).reduce((m, p) => (p.id > m ? p.id : m), 0);
+const freshPosts = list => (knownMaxPostId > 0 ? validPostIds(list).filter(p => p.id > knownMaxPostId) : []);
+const notifyPref = () => { try { return localStorage.getItem(NEWS_NOTIFY_KEY) === 'on'; } catch (e) { return false; } };
+const notifyStatus = () => {
+  if (!('Notification' in window)) return 'unsupported';
+  return Notification.permission;
+};
+
+function updateNewsBadge(n) {
+  const badge = $('newsBadge');
+  if (!badge) return;
+  if (n > 0) {
+    const next = n > 99 ? '99+' : String(n);
+    if (badge.textContent !== next || badge.hidden) {
+      badge.textContent = next;
+      badge.hidden = false;
+      badge.classList.remove('pop');
+      void badge.offsetWidth;
+      badge.classList.add('pop');
+    }
+  } else {
+    badge.hidden = true;
+  }
+}
+
+function syncNotifyUI() {
+  const sw = $('switchNotify');
+  if (sw) sw.classList.toggle('on', notifyPref() && notifyStatus() === 'granted');
+  const hint = $('notifyHint');
+  if (!hint) return;
+  const st = notifyStatus();
+  if (st === 'denied') {
+    hint.hidden = false;
+    hint.textContent = 'Уведомления заблокированы в браузере — работает только бейдж на «Новости». Разблокировать: адресная строка → разрешения → Уведомления.';
+  } else if (st === 'unsupported') {
+    hint.hidden = false;
+    hint.textContent = 'Этот браузер не поддерживает системные уведомления — работает только бейдж.';
+  } else if (notifyPref() && st === 'default') {
+    hint.hidden = false;
+    hint.textContent = 'Браузер ещё не выдал разрешение — нажмите переключатель ещё раз после запроса.';
+  } else {
+    hint.hidden = true;
+  }
+}
+
+function maybeNotify(list) {
+  const fresh = freshPosts(list);
+  if (!fresh.length) return;
+  if (!notifyPref()) return;
+  if (notifyStatus() !== 'granted') return;
+  const latest = fresh.reduce((a, b) => (b.id > a.id ? b : a));
+  const text = (latest.text || 'Новое сообщение в канале').replace(/\s+/g, ' ').trim();
+  const body = text.length > 140 ? text.slice(0, 137) + '…' : text;
+  try {
+    const n = new Notification('Антитеррор · новый пост', {body, tag: 'antitb-news-' + latest.id});
+    n.onclick = () => { window.focus(); switchTab('news'); n.close(); };
+  } catch (e) { /* notifications may be blocked silently */ }
+}
+
+function markNewsSeen(list) {
+  const mx = maxPostId(list || channelPosts);
+  if (mx > knownMaxPostId) {
+    knownMaxPostId = mx;
+    try { localStorage.setItem(NEWS_SEEN_KEY, String(mx)); } catch (e) { /* ignore */ }
+  }
+  updateNewsBadge(0);
+}
+
+function noteNewPosts(list) {
+  const mx = maxPostId(list);
+  if (!mx) return;
+  const root = $('appRoot');
+  if (root && root.dataset.tab === 'news') { markNewsSeen(list); return; } // читатель уже смотрит ленту
+  if (!knownMaxPostId) {
+    knownMaxPostId = mx; // первый заход: молча запоминаем, без бейдж-шторма
+    try { localStorage.setItem(NEWS_SEEN_KEY, String(mx)); } catch (e) { /* ignore */ }
+    updateNewsBadge(0);
+    return;
+  }
+  updateNewsBadge(freshPosts(list).length);
+  maybeNotify(list);
+}
+
 async function refreshPosts() {
   if (!TG_CHANNEL || postsLoading || Date.now() - postsLoadedAt < FETCH_TTL) return;
   postsLoading = true;
@@ -3025,6 +3138,7 @@ async function refreshPosts() {
     syncStore(channelPosts);
     postsLoadedAt = Date.now();
     postsFailed = false;
+    noteNewPosts(channelPosts);
   } catch {
     postsFailed = true;
   } finally {
@@ -3076,6 +3190,7 @@ function switchTab(tab) {
 
   if (tab === 'news') {
     renderNews();
+    markNewsSeen(channelPosts);
     refreshPosts();
   }
 
@@ -3128,6 +3243,17 @@ bindToggle('toggleLabelsRow', 'switchLabels', 'labels', () => refreshLines());
 bindToggle('toggleSightRow', 'switchSight', 'sightings', renderSightings);
 bindToggle('toggleTrainsRow', 'switchTrains', 'trains', renderTrains);
 bindToggle('toggleLegendRow', 'switchLegend', 'legend', () => $('legendBox').classList.toggle('hidden', !state.legend));
+$('toggleNotifyRow').addEventListener('click', () => {
+  const next = !(notifyPref() && notifyStatus() === 'granted');
+  try { localStorage.setItem(NEWS_NOTIFY_KEY, next ? 'on' : 'off'); } catch (e) { /* ignore */ }
+  const st = notifyStatus();
+  if (next && st === 'default' && 'Notification' in window) {
+    try { Notification.requestPermission().finally(syncNotifyUI); } catch (e) { syncNotifyUI(); }
+  } else {
+    syncNotifyUI();
+  }
+});
+syncNotifyUI();
 
 positionThumb(dockEl.querySelector('.nav-btn.selected'));
 syncColors();
