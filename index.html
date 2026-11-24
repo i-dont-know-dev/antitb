@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b1224">
+<meta name="theme-color" content="#0b1224" id="metaThemeColor">
 <title>АнтиТБ</title>
+<script>try{var t=localStorage.getItem('antitb-theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{
@@ -25,6 +26,67 @@
   --d4:#40b280;
   --shadow:0 4px 16px rgba(0,0,0,.3);
   --font:Roboto,system-ui,-apple-system,sans-serif;
+  --tile-filter:brightness(0.55) sepia(1) saturate(2.5) hue-rotate(195deg) contrast(1.1);
+}
+[data-theme="amoled"]{
+  --bg:#000000;
+  --surface:#0d1014;
+  --surface-high:#151920;
+  --on-surface:#e8eaed;
+  --on-surface-variant:#9aa0a6;
+  --outline:rgba(255,255,255,.12);
+  --outline-variant:rgba(255,255,255,.06);
+  --primary:#22d3ee;
+  --on-primary:#001f24;
+  --primary-container:rgba(34,211,238,.18);
+  --on-primary-container:#a5f3fc;
+  --shadow:0 4px 18px rgba(0,0,0,.55);
+  --tile-filter:brightness(0.42) contrast(1.18) saturate(0.55);
+}
+[data-theme="graphite"]{
+  --bg:#16171a;
+  --surface:#1f2024;
+  --surface-high:#28292e;
+  --on-surface:#e6e6ea;
+  --on-surface-variant:#a3a3ab;
+  --outline:rgba(255,255,255,.11);
+  --outline-variant:rgba(255,255,255,.055);
+  --primary:#f2a33c;
+  --on-primary:#241300;
+  --primary-container:rgba(242,163,60,.2);
+  --on-primary-container:#fcd34d;
+  --shadow:0 4px 16px rgba(0,0,0,.4);
+  --tile-filter:grayscale(0.55) brightness(0.58) contrast(1.08);
+}
+[data-theme="forest"]{
+  --bg:#0a1a12;
+  --surface:#102217;
+  --surface-high:#173023;
+  --on-surface:#e8f4ec;
+  --on-surface-variant:#8fb39e;
+  --outline:rgba(255,255,255,.11);
+  --outline-variant:rgba(255,255,255,.055);
+  --primary:#34d399;
+  --on-primary:#032117;
+  --primary-container:rgba(52,211,153,.18);
+  --on-primary-container:#a7f3d0;
+  --shadow:0 4px 16px rgba(0,0,0,.42);
+  --tile-filter:sepia(0.9) saturate(1.8) hue-rotate(95deg) brightness(0.56) contrast(1.1);
+}
+[data-theme="paper"]{
+  --bg:#efede6;
+  --surface:#ffffff;
+  --surface-high:#e7e4da;
+  --on-surface:#1f2329;
+  --on-surface-variant:#5b6470;
+  --outline:rgba(31,35,41,.18);
+  --outline-variant:rgba(31,35,41,.1);
+  --primary:#4338ca;
+  --on-primary:#ffffff;
+  --primary-container:rgba(67,56,202,.12);
+  --on-primary-container:#3730a3;
+  --shadow:0 4px 16px rgba(31,35,41,.18);
+  --tile-filter:none;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{
@@ -59,29 +121,29 @@ button,input{font:inherit;color:inherit}
   font-family:var(--font)!important;
 }
 .leaflet-tile{
-  filter:brightness(0.55) sepia(1) saturate(2.5) hue-rotate(195deg) contrast(1.1);
+  filter:var(--tile-filter);
 }
 .leaflet-control-attribution{
   font-size:10px!important;
-  background:rgba(11,18,36,.85)!important;
-  color:#97a2b8!important;
+  background:color-mix(in srgb, var(--surface) 88%, transparent)!important;
+  color:var(--on-surface-variant)!important;
   border-radius:8px 0 0 0!important;
 }
-.leaflet-control-attribution a{color:#c7d2fe!important}
+.leaflet-control-attribution a{color:var(--on-primary-container)!important}
 .mcd-station-label{
   background:transparent!important;
   border:0!important;
   box-shadow:none!important;
-  color:#f8fafc!important;
+  color:var(--on-surface)!important;
   font-family:var(--font)!important;
   font-size:11.5px!important;
   font-weight:600!important;
   padding:2px 4px!important;
-  text-shadow:0 0 3px #0b1224, 0 0 3px #0b1224;
+  text-shadow:0 0 3px var(--bg), 0 0 3px var(--bg);
   pointer-events:auto;
   cursor:pointer;
 }
-.mcd-station-label:hover{color:#c7d2fe!important}
+.mcd-station-label:hover{color:var(--on-primary-container)!important}
 .mcd-station-label::before{display:none!important}
 .top-overlay{
   position:absolute;
@@ -381,6 +443,13 @@ button,input{font:inherit;color:inherit}
 .train-detail{position:relative;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 10px 10px rgba(0,0,0,.55)) drop-shadow(0 0 7px rgba(0,0,0,.4))}
 .train-detail svg{width:150px;height:auto;overflow:visible}
 .train-detail-plaque{margin-top:3px;background:var(--surface);color:var(--on-surface);font-size:11px;font-weight:800;padding:2px 9px;border-radius:7px;border:1px solid var(--c);letter-spacing:.4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.theme-grid{display:flex;gap:6px;flex-wrap:wrap;padding:2px 0 4px}
+.theme-dot{display:flex;flex-direction:column;align-items:center;gap:7px;background:transparent;border:0;cursor:pointer;padding:6px 8px;border-radius:14px;min-width:64px}
+.theme-swatch{width:44px;height:44px;border-radius:50%;border:2px solid var(--outline);box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease}
+.theme-dot:hover .theme-swatch{transform:scale(1.1)}
+.theme-dot.active .theme-swatch{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-container),0 2px 6px rgba(0,0,0,.4)}
+.theme-name{font-size:11px;color:var(--on-surface-variant);font-weight:600;letter-spacing:.2px}
+.theme-dot.active .theme-name{color:var(--on-surface)}
 .news-link{display:inline-block;margin-top:10px;font-size:12px;font-weight:600;color:var(--primary);text-decoration:none}
 .m3-card p{margin:0;font-size:13px;line-height:1.5;color:var(--on-surface-variant)}
 .color-row{
@@ -643,6 +712,31 @@ input{user-select:text}
       <h2>Настройки</h2>
     </div>
     <div class="m3-card">
+      <div class="m3-card-title">Тема оформления</div>
+      <div class="theme-grid" id="themeGrid" role="group" aria-label="Тема оформления">
+        <button type="button" class="theme-dot active" data-theme="midnight" aria-pressed="true">
+          <span class="theme-swatch" style="background:linear-gradient(135deg,#111a33 0 55%,#818cf8 55% 100%)"></span>
+          <span class="theme-name">Миднайт</span>
+        </button>
+        <button type="button" class="theme-dot" data-theme="amoled" aria-pressed="false">
+          <span class="theme-swatch" style="background:linear-gradient(135deg,#0d1014 0 55%,#22d3ee 55% 100%)"></span>
+          <span class="theme-name">Амолед</span>
+        </button>
+        <button type="button" class="theme-dot" data-theme="graphite" aria-pressed="false">
+          <span class="theme-swatch" style="background:linear-gradient(135deg,#1f2024 0 55%,#f2a33c 55% 100%)"></span>
+          <span class="theme-name">Графит</span>
+        </button>
+        <button type="button" class="theme-dot" data-theme="forest" aria-pressed="false">
+          <span class="theme-swatch" style="background:linear-gradient(135deg,#102217 0 55%,#34d399 55% 100%)"></span>
+          <span class="theme-name">Хвоя</span>
+        </button>
+        <button type="button" class="theme-dot" data-theme="paper" aria-pressed="false">
+          <span class="theme-swatch" style="background:linear-gradient(135deg,#ffffff 0 55%,#4338ca 55% 100%)"></span>
+          <span class="theme-name">Бумага</span>
+        </button>
+      </div>
+    </div>
+    <div class="m3-card">
       <div class="m3-card-title">Цвета линий МЦД</div>
       <div class="color-row">
         <div class="color-info">
@@ -724,7 +818,7 @@ input{user-select:text}
       </div>
       <p class="attribution-note" id="sightStatus"></p>
     </div>
-    <p class="attribution-note">Подложка: Esri World Dark Gray Base.</p>
+    <p class="attribution-note" id="basemapNote">Подложка: Esri World Dark Gray Base.</p>
   </section>
   <div class="dock-wrap">
     <nav class="mac-dock" id="macDock" aria-label="Основная навигация">
@@ -1651,15 +1745,25 @@ const crs = L.CRS.EPSG3857;
 const WORLD_M = 40075016.686;
 const RADIUS = 4500000;
 const CORE_RADIUS = 600000;
-const TINT = '#1e3a6f';
-const SHADE = '#0a1530';
-const VEIL = 'rgba(6,12,28,0.4)';
 const STATION_MIN_ZOOM = 10.5;
 const TRUNK_STATION_ZOOM = 6;
 const LABEL_MIN_ZOOM = 12.5;
 const lineWeight = z => Math.min(5, Math.max(2.2, 2.2 + (z - 8) * 0.45));
-const TILE_URL = (z, x, y) =>
-  `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${z}/${y}/${x}`;
+const TILE_BUILDERS = {
+  dark: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${z}/${y}/${x}`,
+  light: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Canvas/MapServer/tile/${z}/${y}/${x}`,
+};
+const THEME_DEFS = {
+  midnight: {tile: 'dark', note: 'Esri World Dark Gray Base'},
+  amoled:   {tile: 'dark', note: 'Esri World Dark Gray Base'},
+  graphite: {tile: 'dark', note: 'Esri World Dark Gray Base'},
+  forest:   {tile: 'dark', note: 'Esri World Dark Gray Base'},
+  paper:    {tile: 'light', note: 'Esri World Light Canvas Base'},
+};
+const THEME_META = {midnight: '#0b1224', amoled: '#000000', graphite: '#16171a', forest: '#0a1a12', paper: '#efede6'};
+let currentTheme = document.documentElement.dataset.theme || 'midnight';
+if (!THEME_DEFS[currentTheme]) currentTheme = 'midnight';
+const TILE_URL = (z, x, y) => TILE_BUILDERS[THEME_DEFS[currentTheme].tile](z, x, y);
 
 const circleAt = (z, radius = RADIUS) => {
   const c = crs.latLngToPoint(L.latLng(MCD_CENTER), z);
@@ -1677,7 +1781,7 @@ const tileCache = new Map();
 const TILE_CACHE_MAX = 1500;
 
 function loadTile(z, x, y) {
-  const key = `${z}/${x}/${y}`;
+  const key = `${currentTheme}/${z}/${x}/${y}`;
   const hit = tileCache.get(key);
   if (hit) {
     tileCache.delete(key);
@@ -2066,6 +2170,29 @@ chips.forEach(chip => chip.addEventListener('click', () => {
   closeStationSheet();
   refreshLines();
 }));
+
+const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+function applyTheme(t) {
+  if (!THEME_DEFS[t]) return;
+  currentTheme = t;
+  document.documentElement.dataset.theme = t;
+  if (metaThemeColor) metaThemeColor.setAttribute('content', THEME_META[t] || '#0b1224');
+  try { localStorage.setItem('antitb-theme', t); } catch (e) { /* private mode */ }
+  document.querySelectorAll('#themeGrid .theme-dot').forEach(btn => {
+    const active = btn.dataset.theme === t;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+  const note = $('basemapNote');
+  if (note) note.textContent = `Подложка: ${THEME_DEFS[t].note}.`;
+  tileCache.clear();
+  if (baseLayer) baseLayer.redraw();
+}
+$('themeGrid').addEventListener('click', e => {
+  const btn = e.target.closest('.theme-dot');
+  if (btn) applyTheme(btn.dataset.theme);
+});
+applyTheme(currentTheme);
 
 const PROXIES = [
   ...(WORKER_URL ? [{url: () => WORKER_URL + '/api/news', timeout: 15000}] : []),
