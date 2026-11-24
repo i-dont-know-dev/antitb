@@ -825,7 +825,8 @@ input{user-select:text}
 </div>
 <script src="vendor/pmtiles.js"></script>
 <script type="module">
-import maplibregl from './vendor/maplibre-gl.mjs';
+import * as maplibregl from './vendor/maplibre-gl.mjs';
+maplibregl.setWorkerUrl('./vendor/maplibre-gl-worker.mjs');
 const __protocol = new pmtiles.Protocol();
 maplibregl.addProtocol('pmtiles', __protocol.tile);
 const LINES = {
